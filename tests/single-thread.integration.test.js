@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createServer as createTcpServer} from 'node:net';
-import {spawn,spawnSync} from 'node:child_process';
-import {once} from 'node:events';
+import {spawnSync} from 'node:child_process';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {audit} from '../src/audit.js';
+import {startPhpFixture} from './helpers/php-fixture.js';
 
 const chromium=process.env.CHROMIUM_PATH||'chromium';
-const phpAvailable=spawnSync('php',['--version'],{stdio:'ignore',windowsHide:true}).status===0;
+const phpAvailable=spawnSync('php',['--version'],{stdio:'ignore',windowsHide:true,timeout:2000}).status===0;
 const freePort=async()=>{const server=createTcpServer();await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));const port=server.address().port;await new Promise(resolve=>server.close(resolve));return port;};
 
 test('default audit concurrency is one against a single-threaded server',async t=>{
@@ -60,11 +60,9 @@ test('failed navigation closes the tab and browser and cannot report a clean pag
 
 test('PHP built-in single-threaded server handles sequential audited routes',{skip:!phpAvailable},async t=>{
  const port=await freePort();const fixtureDir=new URL('./fixtures/',import.meta.url);
- const php=spawn('php',['-S',`127.0.0.1:${port}`,'router.php'],{cwd:fixtureDir,stdio:'ignore',windowsHide:true});
- t.after(async()=>{if(php.exitCode===null){php.kill('SIGTERM');await Promise.race([once(php,'exit'),new Promise(resolve=>setTimeout(resolve,2000))]);}});
- const base=`http://127.0.0.1:${port}`;let ready=false;
- for(let attempt=0;attempt<40;attempt++){try{const response=await fetch(base,{signal:AbortSignal.timeout(250)});if(response.ok){ready=true;break;}}catch{}await new Promise(resolve=>setTimeout(resolve,50));}
- assert.equal(ready,true,'PHP fixture server should start within two seconds');
+ const php=startPhpFixture({port,cwd:fixtureDir});
+ t.after(()=>php.close()); // Registered before readiness and every audit assertion.
+ await php.ready();const base=php.base;
  const out=await mkdtemp(join(tmpdir(),'vud-php-'));t.after(()=>rm(out,{recursive:true,force:true}));
  const report=await audit({url:base,routes:['/one','/two','/three'],viewports:['mobile'],out,chromium,screenshots:false,waitMs:0,timeoutMs:10000});
  assert.equal(report.config.concurrency,1);
