@@ -12,6 +12,39 @@ const waitForExit=(child,timeoutMs)=>exited(child)?Promise.resolve(true):new Pro
  child.once('exit',onExit);
 });
 
+function verifiedGoneTree(output,child,isAlive){
+ const records=new Map();let errors=0;
+ const lines=output.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+ for(let index=0;index<lines.length;index++){
+  const success=/^SUCCESS: The process with PID (\d+)(?: \(child process of PID (\d+)\))? has been terminated\.$/.exec(lines[index]);
+  const failure=/^ERROR: The process with PID (\d+)(?: \(child process of PID (\d+)\))? could not be terminated\.$/.exec(lines[index]);
+  const missing=/^ERROR: The process "(\d+)" not found\.$/.exec(lines[index]);
+  const record=success||failure||missing;if(!record)return false;
+  if(failure){
+   // Both exact English templates were observed on this Windows host during
+   // owned-process exit races. Neither is safe without independent death proof.
+   if(!/^Reason: (?:There is no running instance of the task|The operation attempted is not supported)\.$/.test(lines[++index]||''))return false;
+  }
+  const pid=Number(record[1]),parent=record[2]?Number(record[2]):null;
+  if(!Number.isSafeInteger(pid)||pid<=0||records.has(pid))return false;
+  records.set(pid,parent);if(failure||missing)errors++;
+ }
+ if(!errors||!records.has(child.pid))return false;
+ for(const pid of records.keys()){
+  // Parent PIDs are ancestry context, NOT taskkill targets. The root's parent
+  // (our live Node caller) must not be mistaken for a surviving browser child.
+  let cursor=pid;const visited=new Set();
+  while(cursor!==child.pid){
+   if(visited.has(cursor)||!records.has(cursor))return false;
+   visited.add(cursor);cursor=records.get(cursor);
+  }
+  // An exited owned handle wins over possible reuse of its numeric root PID.
+  // A live/reused descendant PID remains ambiguous and therefore fails closed.
+  if(!(pid===child.pid&&exited(child))&&isAlive(pid))return false;
+ }
+ return true;
+}
+
 export async function stopOwnedProcess(child,{timeoutMs=5000,platform=process.platform,launch=spawn,isAlive=alive,graceful=false}={}){
  if(!child.pid||exited(child))return; // Never signal a PID after its owned process exited.
  if(graceful){
@@ -35,15 +68,9 @@ export async function stopOwnedProcess(child,{timeoutMs=5000,platform=process.pl
     killer.once('error',onError);killer.once('close',onClose);
    });
    if(code!==0){
-    // taskkill races Chrome's own exit and reports errors for already-gone PIDs.
-    // Accept only that known race, and independently prove every reported PID gone.
-    // Unknown/localized errors or truncated output fail closed; raw output is never emitted.
-    const pids=new Set([...output.matchAll(/\bPID\s+(\d+)\b/gi)].map(match=>Number(match[1])));
-    const notFound=[...output.matchAll(/^ERROR:\s*The process "(\d+)" not found\.\s*$/gim)];
-    for(const match of notFound)pids.add(Number(match[1]));
-    const reasons=[...output.matchAll(/^Reason:\s*(.+)$/gim)].map(match=>match[1].trim());
-    const errors=(output.match(/^ERROR:/gim)||[]).length;
-    const goneRace=[128,255].includes(code)&&!overflow&&errors>0&&reasons.length+notFound.length===errors&&reasons.every(reason=>/^There is no running instance of the task\.?$/i.test(reason))&&pids.has(child.pid)&&[...pids].every(pid=>(pid===child.pid&&exited(child))||!isAlive(pid));
+    // Consume complete, known records only; unknown/localized/truncated output
+    // fails closed even when all numeric PIDs happen to be gone.
+    const goneRace=[128,255].includes(code)&&!overflow&&verifiedGoneTree(output,child,isAlive);
     if(!goneRace)throw new Error(`Browser process-tree shutdown failed: taskkill exit code ${code??'none'}`);
    }
   }finally{clearTimeout(timer);killer.off('error',onError);killer.off('close',onClose);killer.stdout?.off('data',capture);killer.stderr?.off('data',capture);killer.stdout?.destroy();killer.stderr?.destroy();output='';}
