@@ -38,7 +38,7 @@ test('early browser exit reports launch cause promptly and cleans its profile',a
  const launch=(executable,args)=>{
   profile=args.find(arg=>arg.startsWith('--user-data-dir=')).slice('--user-data-dir='.length);
   const child=new EventEmitter();Object.assign(child,{exitCode:null,signalCode:null,stderr:new PassThrough()});
-  queueMicrotask(()=>{child.stderr.write('No usable sandbox! https://private.example/?token=never-log-this');child.exitCode=1;child.emit('exit',1,null);});
+  queueMicrotask(()=>{child.stderr.write('No usable sandbox! https://private.example/?token=never-log-this'+'\ncrash frame'.repeat(2000));child.exitCode=1;child.emit('exit',1,null);});
   return child;
  };
  const started=Date.now();

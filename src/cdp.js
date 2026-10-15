@@ -55,11 +55,14 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
  try{child=launch(executable,['--headless=new',...(process.env.VISION_UI_NO_SANDBOX==='1'?['--no-sandbox']:[]),'--no-first-run','--no-default-browser-check','--no-proxy-server','--disable-background-networking','--disable-extensions','--disable-dev-shm-usage','--remote-allow-origins=*','--remote-debugging-address=127.0.0.1',`--remote-debugging-port=${port}`,`--user-data-dir=${profilePath}`,'about:blank'],{stdio:['ignore','ignore','pipe'],windowsHide:true});}
  catch(error){await rm(profilePath,{force:true,recursive:true});throw new Error(`Browser startup launch failed (${error.code||'spawn error'})`);}
  // Never emit raw browser stderr: it can contain URLs, profile paths or page data.
- let stderr='',spawnError;
- const capture=chunk=>{stderr=(stderr+chunk.toString()).slice(-8192);};
+ let stderr='',stderrHead='',spawnError;
+ const capture=chunk=>{const text=chunk.toString();stderrHead=(stderrHead+text).slice(0,8192);stderr=(stderr+text).slice(-8192);};
  const launchError=error=>{spawnError=error.code||'spawn error';};
  child.stderr?.on('data',capture);child.on('error',launchError);
- const diagnostics=()=>/no usable sandbox|sandbox.*(failed|not supported)|namespace.*(failed|not permitted)|operation not permitted/i.test(stderr)?'Chromium sandbox unavailable; check host user-namespace/AppArmor policy':/error while loading shared libraries/i.test(stderr)?'Chromium shared library missing':/address already in use/i.test(stderr)?'DevTools port unavailable':'No recognized Chrome diagnostic (raw stderr withheld)';
+ const diagnostics=()=>{
+  const text=stderrHead+stderr;
+  return /no usable sandbox|sandbox.*(failed|not supported)|namespace.*(failed|not permitted)|operation not permitted/i.test(text)?'Chromium sandbox unavailable; check host user-namespace/AppArmor policy':/error while loading shared libraries/i.test(text)?'Chromium shared library missing':/address already in use/i.test(text)?'DevTools port unavailable':/crashpad.*(required|failed)/i.test(text)?'Chromium crash handler failed':'No recognized Chrome diagnostic (raw stderr withheld)';
+ };
  const startupFailure=()=>spawnError?new Error(`Browser startup launch failed (${spawnError})`):hasExited(child)?new Error(`Browser startup exited (code ${child.exitCode??'none'}, signal ${child.signalCode??'none'}); ${diagnostics()}`):null;
  const tabs=new Set();let closePromise=null,closed=false,resolveInterrupted,rejectInterrupted;
  const interrupted=new Promise((resolve,reject)=>{resolveInterrupted=resolve;rejectInterrupted=reject;});
@@ -72,7 +75,7 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
    removeSignalHandlers();const errors=[];
    for(const tab of [...tabs])try{await tab.close();}catch(error){errors.push(error);}
    try{await killProcessTree(child,shutdownTimeout);}catch(error){errors.push(error);}
-   child.stderr?.off('data',capture);child.stderr?.destroy();child.off('error',launchError);stderr='';
+   child.stderr?.off('data',capture);child.stderr?.destroy();child.off('error',launchError);stderr='';stderrHead='';
    try{await rm(profilePath,{force:true,recursive:true,maxRetries:3,retryDelay:100});}catch(error){errors.push(new Error(`Temporary browser profile cleanup failed: ${error.message}`));}
    closed=true;
    if(errors.length)throw new AggregateError(errors,'Browser cleanup failed');
