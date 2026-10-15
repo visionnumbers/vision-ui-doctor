@@ -19,7 +19,11 @@ jobs:
         run: node scripts/browser-smoke.js
         env:
           CHROMIUM_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          # Disposable hosted runner, repository fixtures only. AppArmor restricts
+          # user namespaces; this explicit opt-in reduces browser isolation in CI.
+          VISION_UI_NO_SANDBOX: '1'
       - name: Run tests
         run: npm test
         env:
           CHROMIUM_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          VISION_UI_NO_SANDBOX: '1'

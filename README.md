@@ -95,4 +95,13 @@ Do not use guessed API URLs on production. The sample endpoint config is illustr
 
 Run `npm test` (in restricted Linux containers, `VISION_UI_NO_SANDBOX=1 npm test` may be required; never disable sandbox on an untrusted host unnecessarily). The repository ships `.agents/skills/vision-ui-doctor/SKILL.md`, a Claude plugin manifest and a Gemini extension manifest; validate installation against your host's current supported integrations.
 
+CI first runs `node scripts/browser-smoke.js` to verify the browser version,
+DevTools access and owned process/profile cleanup. Ubuntu hosted runners restrict
+unprivileged user namespaces through AppArmor. The Chrome smoke and test steps
+explicitly set `VISION_UI_NO_SANDBOX=1` for repository fixtures on disposable CI
+machines. This removes Chromium's sandbox isolation: do not use that setting to
+scan untrusted sites or on a shared host with credentials. Normal CLI launches
+keep the sandbox enabled. Startup failures report exit/signal and bounded,
+sanitized diagnostic categories; raw Chrome stderr is never printed.
+
 MIT license. This is a diagnostic development tool, not a penetration-testing suite or source-code repair guarantee.
