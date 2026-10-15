@@ -105,3 +105,12 @@ keep the sandbox enabled. Startup failures report exit/signal and bounded,
 sanitized diagnostic categories; raw Chrome stderr is never printed.
 
 MIT license. This is a diagnostic development tool, not a penetration-testing suite or source-code repair guarantee.
+
+Browser shutdown closes page sockets, requests Chromium's `Browser.close`, and
+waits for process and inherited-stream closure before deleting its isolated
+temporary profile. Windows force termination is scoped to the owned process tree.
+Cleanup stages retain their own five-second budget when navigation times out sooner.
+Transient `EBUSY`, `EPERM` and `ENOTEMPTY` removal failures have six bounded retries
+(2.1 seconds of total backoff). Exhausted cleanup rejects with the stage, error
+code and path type, without printing private paths or contents; a retained profile
+is never reported as successful cleanup. Normal Chrome profiles are never targeted.

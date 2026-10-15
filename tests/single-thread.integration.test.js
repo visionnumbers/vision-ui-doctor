@@ -46,7 +46,7 @@ test('slow streamed navigation fails within its configured bound and is incomple
 test('failed navigation closes the tab and browser and cannot report a clean page',async t=>{
  let tabClosed=false,browserClosed=false;
  const tab={send:async method=>method==='Page.navigate'?{errorText:'net::ERR_CONNECTION_REFUSED'}:{},evaluate:async()=>null,close:async()=>{tabClosed=true;}};
- const browserFactory=async()=>({tab:async()=>tab,close:async()=>{browserClosed=true;}});
+ const browserFactory=async options=>{assert.equal(options.shutdownTimeout,5000,'Short navigation deadlines must not shorten browser cleanup');return {tab:async()=>tab,close:async()=>{browserClosed=true;}};};
  const out=await mkdtemp(join(tmpdir(),'vud-failed-nav-'));t.after(()=>rm(out,{recursive:true,force:true}));
  const report=await audit({url:'http://127.0.0.1:4173',routes:['/offline'],viewports:['mobile'],out,screenshots:false,waitMs:0,timeoutMs:500,browserFactory});
  assert.equal(tabClosed,true);

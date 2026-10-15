@@ -59,7 +59,7 @@ test('records a cross-origin redirect instead of collecting destination links',a
 test('discovery timeout is reported and closes its tab and browser',async()=>{
  let browserClosed=false,tabClosed=false;
  const tab={send:method=>method==='Page.navigate'?new Promise(()=>{}):Promise.resolve({}),evaluate:async()=>'',close:async()=>{tabClosed=true;}};
- const browserFactory=async()=>({tab:async()=>tab,close:async()=>{browserClosed=true;}});
+ const browserFactory=async options=>{assert.equal(options.shutdownTimeout,5000,'Short discovery deadlines must not shorten browser cleanup');return {tab:async()=>tab,close:async()=>{browserClosed=true;}};};
  const result=await discoverRoutes({url:'http://127.0.0.1:4173/app/',maxRoutes:2,waitMs:0,timeoutMs:20,browserFactory});
  assert.match(result.errors[0]?.error||'',/Discovery navigation timed out after 20 ms.*\/app\//i);
  assert.equal(tabClosed,true);
