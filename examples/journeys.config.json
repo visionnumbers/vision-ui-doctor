@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "baseUrl": "http://127.0.0.1:4173/app/",
+  "routes": [
+    {"id": "home", "url": "./", "access": "public"},
+    {"id": "dashboard", "url": "./#/dashboard", "access": "protected"}
+  ],
+  "viewports": ["mobile"],
+  "journeys": [
+    {
+      "id": "inspect-menu",
+      "routeId": "dashboard",
+      "steps": [
+        {"id": "navigate", "action": "navigate", "url": "./#/dashboard"},
+        {"id": "open", "action": "click", "selector": "button[data-test=menu]"},
+        {"id": "visible", "action": "assertVisible", "selector": "[role=menu]"},
+        {"id": "hidden", "action": "assertHidden", "selector": "[data-test=loading]"},
+        {"id": "ready", "action": "waitForVisible", "selector": "main", "timeoutMs": 2000},
+        {"id": "location", "action": "assertUrl", "url": "./#/dashboard"}
+      ]
+    }
+  ]
+}

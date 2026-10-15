@@ -83,7 +83,112 @@ node .\tools\vision-ui-doctor\src\cli.js audit --url "https://your-site.example/
 
 Do not use guessed API URLs on production. The sample endpoint config is illustrative and must be edited first. Never put secret tokens in the path or query string.
 
-## Outputs
+## Project configuration and offline planning (M2.1)
+
+Project files are local JSON with `schemaVersion: 1`. There is no remote config
+loading, JavaScript, shell expansion, environment interpolation or inline login
+credential support. Unknown fields and explicit `null` values are rejected.
+
+```powershell
+node .\src\cli.js validate --config ".\examples\project.config.json"
+node .\src\cli.js plan --config ".\examples\journeys.config.json"
+node .\src\cli.js audit --config ".\examples\project.config.json" --viewports mobile --out "reports\config-audit"
+```
+
+The examples use illustrative localhost URLs; start your authorized test app and
+edit the base URL/routes first. `validate` and `plan` do not start Chrome, contact
+the site, read credential variables or write reports. `plan` prints deterministic
+JSON to stdout; redirect it locally if needed. A plan describes **planned**, not
+attempted or audited, states. Protected declarations and all journey actions are
+**schema-only**: M2.1 does not log in, click or execute journeys. Config-based
+`audit` fails before any work when the file contains protected routes or journeys,
+or when combined with discovery, login or backend options. It does not silently
+skip unsupported work. CLI-only audits retain their existing behavior.
+
+Actual version 1 schema (all objects reject extra fields):
+
+| Field | Contract / default |
+|---|---|
+| `schemaVersion` | Required integer `1` |
+| `baseUrl` | Required absolute HTTP(S) application base; `/app` becomes `/app/`; no credentials, query, fragment, backslash or dot segments |
+| `routes` | Required nonempty array of `{id, url, access}`; access is `public` or `protected` |
+| `journeys` | Optional array of `{id, routeId, steps}`, default `[]`; routeId must exist |
+| `steps` | Nonempty array of `{id, action, url?, selector?, timeoutMs?}`; see action rules below |
+| `viewports` | Unique names from `small,mobile,tablet,laptop,desktop`; defaults to all five |
+| `limits` | Optional object; defaults/hard caps below |
+| `waitMs` | Integer 0–10000, default 550 |
+| `concurrency` | Integer 1–8, default 1 |
+| `screenshots` | Boolean, default true |
+| `out` | Nonempty local output directory string, default `reports/ui-audit`; no interpolation |
+
+IDs are explicit stable lowercase slugs starting with a letter, at most 48
+characters, using only letters, digits and `-`. Route/journey IDs are unique in
+their respective collections; step IDs are unique within a journey. Use opaque,
+non-sensitive IDs, not account names or secret values. Canonically equivalent
+route URLs are rejected even with different IDs. Reordering entries does not
+change their state IDs, but it does change execution-plan order.
+
+`navigate` and `assertUrl` require `url` and forbid `selector`. `click`,
+`assertVisible`, `assertHidden` and `waitForVisible` require `selector` and forbid
+`url`. An optional step timeout is 250 ms through the configured project timeout.
+Selectors are limited to 512 characters and a deliberately conservative CSS
+subset: tags, `#id`, `.class`, `[attribute]`, `[attribute=value]` (quoted or simple
+unquoted values), descendant and `> + ~` combinators. Pseudo-classes, comma lists,
+escapes, comments and browser-specific extensions are unsupported. Validation
+does not prove an element exists or that an action is safe to execute later.
+
+| Limit | Default | Hard maximum |
+|---|---:|---:|
+| `maxRoutes` | 30 | 100 |
+| `maxJourneys` | 20 | 20 |
+| `maxSteps` (per journey) | 50 | 50 |
+| `maxPlannedStates` | 500 | 1000 |
+| `timeoutMs` | 10000 | 60000 |
+
+Count limits are positive integers; timeout minimum is 250 ms. Planned states
+count `(routes + all journey steps) × viewports`, including assertions. Files
+must be regular local JSON files no larger than 1 MiB. Symlinks, pipes and
+directories are rejected, with non-blocking/no-follow open flags where supported.
+URL/UNC config sources and output destinations are rejected; quote Windows paths
+containing spaces. Review local output destinations before auditing an untrusted config.
+
+Precedence is **explicit CLI option > validated config > default**. The original
+file must be valid even if overridden. `--url` replaces baseUrl and revalidates all
+routes/steps against that scope. `--routes` and `--viewports` replace, not append,
+their arrays. CLI route overrides receive deterministic canonical-URL-derived
+IDs; journey references must still resolve. Supported scalar overrides are
+`--max-routes`, `--timeout-ms`, `--wait-ms`, `--concurrency`, `--out` and
+`--screenshots` / `--no-screenshots` (mutually exclusive). Config-file relative URLs resolve against baseUrl, not the
+file's directory; output directories remain relative to the current working
+directory. CLI comma-separated route syntax is unchanged; use JSON route entries
+when query values contain literal commas.
+
+Remote planning/validation is offline. Remote **execution** still requires an
+explicit `--allow-remote`; config cannot grant it. Neither `allowRemote` nor
+login/profile/endpoint fields are accepted in version 1. `--no-fail` keeps its
+legacy findings-only semantics and never suppresses invalid config/runtime errors.
+
+Routes and navigation/assertion URLs must be same-origin and within the application
+base path. Meaningful queries, repeated values and SPA `#/` / `#!/` routes are
+preserved using the existing normalizer; ordinary section anchors and tracking
+keys are discarded. Ambiguous encoded path separators/dots are rejected. URLs
+in query **values** remain data, not navigation targets. Known sensitive query
+keys (including token, password, session and signed URL keys) with values are
+rejected in config rather than stored. Do not put secrets under arbitrary keys,
+in paths, identifiers or selectors: no tool can recognize every secret.
+
+Plan schema version 1 contains `configSchemaVersion`, `status: "planned"`,
+`target`, `requiresRemoteConsent`, `limits`, `options` (concurrency, waitMs,
+screenshots), `viewports`, sanitized `routes`,
+journey action metadata and `states`. State IDs are `route:<id>:<viewport>` or
+`journey:<journeyId>:<stepId>:<viewport>`. Plans omit selectors, local output paths,
+credentials and timestamps, and are not executable input. URLs use M1 redaction.
+Errors identify fixed schema locations/rules without echoing JSON values or
+unknown keys. Configured audit runtime errors expose only a safe failure category
+and guidance, not raw filesystem/browser exception text. Exit codes remain 0 success/validate/plan, 1 runtime failure,
+2 detected findings/page/backend failures, 64 invalid arguments/configuration.
+
+### Audit output files
 
 - `report.json` full structured findings, backend statuses, crawl errors, navigation failures.
 - `report.html` visual table summary (UI findings).
