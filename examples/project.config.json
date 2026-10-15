@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "baseUrl": "http://127.0.0.1:4173/",
+  "routes": [
+    {"id": "home", "url": "./", "access": "public"},
+    {"id": "search", "url": "./search?q=example&tag=one&tag=two", "access": "public"}
+  ],
+  "viewports": ["mobile", "desktop"],
+  "limits": {"maxRoutes": 30, "maxJourneys": 20, "maxSteps": 50, "maxPlannedStates": 500, "timeoutMs": 10000},
+  "waitMs": 550,
+  "concurrency": 1,
+  "screenshots": false,
+  "out": "reports/project"
+}
