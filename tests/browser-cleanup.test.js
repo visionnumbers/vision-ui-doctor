@@ -199,3 +199,28 @@ test('Windows-style interrupt settles multiple tabs, processes and profile befor
  assert.equal(fixture.signals.listenerCount('SIGTERM'),0);
  await assert.rejects(lstat(fixture.browser.profilePath),{code:'ENOENT'});
 });
+
+for(const code of [128,255])for(const reason of ['There is no running instance of the task.','The operation attempted is not supported.'])test(`known native race ${code}/${reason} checks subject PIDs, not a live caller ancestor`,async()=>{
+ const browser=child(),killer=child(202);killer.stdout=new PassThrough();
+ await stopOwnedProcess(browser,{platform:'win32',isAlive:pid=>pid===999,launch:()=>{queueMicrotask(()=>{
+  killer.stdout.write(`ERROR: The process with PID 102 (child process of PID 101) could not be terminated.\r\nReason: ${reason}\r\nERROR: The process with PID 101 (child process of PID 999) could not be terminated.\r\nReason: ${reason}\r\n`);
+  killer.exitCode=code;killer.emit('exit',code,null);
+ });return killer;}});
+});
+
+for(const code of [128,255])test(`known race ${code} must fail if a reported descendant is live or its PID reused`,async()=>{
+ const killer=child(202);killer.stdout=new PassThrough();
+ await assert.rejects(stopOwnedProcess(child(),{platform:'win32',isAlive:pid=>pid===102,launch:()=>{queueMicrotask(()=>{
+  killer.stdout.write('ERROR: The process with PID 102 (child process of PID 101) could not be terminated.\nReason: The operation attempted is not supported.\nERROR: The process with PID 101 (child process of PID 999) could not be terminated.\nReason: The operation attempted is not supported.\n');killer.exitCode=code;killer.emit('exit',code,null);
+ });return killer;}}),new RegExp(`taskkill exit code ${code}`));
+});
+
+for(const output of [
+ 'ERROR: The process with PID 101 could not be terminated.\nReason: Access is denied.\n',
+ 'ERROR: Der Prozess mit PID 101 konnte nicht beendet werden.\nGrund: Nicht gefunden.\n',
+ 'ERROR: The process with PID 101 could not be terminated.\nReason: There is no running instance of the task.\nUNRECOGNIZED PRIVATE_DIAGNOSTIC_CANARY\n',
+ 'SUCCESS: The process with PID 777 (child process of PID 888) has been terminated.\nERROR: The process with PID 101 could not be terminated.\nReason: There is no running instance of the task.\n'
+])test('unknown/localized/trailing/unrelated taskkill records fail closed without raw diagnostics',async()=>{
+ const killer=child(202);killer.stdout=new PassThrough();
+ await assert.rejects(stopOwnedProcess(child(),{platform:'win32',isAlive:()=>false,launch:()=>{queueMicrotask(()=>{killer.stdout.write(output);killer.exitCode=128;killer.emit('exit',128,null);});return killer;}}),error=>/taskkill exit code 128/.test(error.message)&&!/PRIVATE_DIAGNOSTIC_CANARY|Der Prozess/.test(error.message));
+});
