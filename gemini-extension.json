@@ -1,0 +1,5 @@
+{
+  "name": "vision-ui-doctor",
+  "version": "0.2.0",
+  "description": "Responsive UI audits with a zero-dependency Chromium CLI and compact reports"
+}

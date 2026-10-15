@@ -1,0 +1,4 @@
+[
+  {"path":"/api/status", "expectedStatus":200},
+  {"path":"/api/private", "expectedStatus":401}
+]

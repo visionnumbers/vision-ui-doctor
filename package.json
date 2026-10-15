@@ -1,0 +1,25 @@
+{
+  "name": "vision-ui-doctor",
+  "version": "0.2.0",
+  "description": "Local-first multi-route responsive UI auditing, form-login support, endpoint checks and agent markdown report",
+  "type": "module",
+  "bin": {
+    "vision-ui-doctor": "./src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1",
+    "audit:demo": "node src/cli.js audit --url http://127.0.0.1:4173 --out reports/demo"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT",
+  "keywords": [
+    "responsive",
+    "chromium",
+    "agent-skills",
+    "audit",
+    "cli",
+    "zero-dependencies"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "vision-ui-doctor",
+  "description": "Evidence-first responsive UI auditing skill and CLI",
+  "version": "0.2.0",
+  "author": {
+    "name": "VisionNumbers Labs"
+  }
+}

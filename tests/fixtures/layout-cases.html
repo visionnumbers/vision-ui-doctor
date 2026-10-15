@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Layout detector cases</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:16px Arial}.case{margin:12px;padding:8px;border:1px solid #ccc}.clip{width:180px;height:80px;overflow:hidden}.clip-child{width:2000px}.form-clip{width:160px;height:70px;overflow:hidden}.form-clip button{margin-left:130px;width:100px;height:36px}.root-overflow{width:2000px;height:20px}.scroll-x{max-width:100%;overflow-x:auto}.scroll-x>pre,.scroll-x>table,.scroll-x>.track{min-width:900px}.editor-shell{width:620px;height:90px;border:1px solid}.drawer{position:fixed;left:0;top:0;width:260px;height:100vh;transform:translateX(-110%)}.modal{position:fixed;left:calc(100vw - 120px);top:100px;width:240px;height:160px;background:#fff;border:2px solid}.sticky{position:sticky;top:0;width:100%;height:30px}.flex{display:flex;width:100%}.long-url{white-space:nowrap}.grid{display:grid;grid-template-columns:minmax(0,1fr)}.grid-child{min-width:700px}.transformed{width:180px;transform:translateX(calc(100vw - 100px))}.dropdown{display:none}.vertical-scroll{height:60px;overflow-y:auto}.vertical-scroll>div{height:240px}.decorative-mask{width:100px;overflow:hidden}.decorative-mask span{display:block;width:500px}
+</style>
+<body>
+<header id="sticky" class="sticky">Sticky header</header>
+<section class="case clip" id="clip"><div id="clipped-content" class="clip-child">Visible clipped content</div></section>
+<section class="case form-clip" id="form-clip"><button id="clipped-submit" type="submit">Submit</button></section>
+<section class="case"><div id="root-overflow" class="root-overflow">Root overflow</div></section>
+<section class="case scroll-x" id="code-scroll"><pre>const intentionallyScrollableCodeLine = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";</pre></section>
+<section class="case scroll-x" id="table-scroll"><table><tr><th>Responsive table</th><th>Wide column</th><th>Another column</th></tr></table></section>
+<section class="case scroll-x" id="carousel"><div class="track">Carousel track</div></section>
+<section class="case"><div id="editor-surface" class="editor-shell" role="textbox">Editor-like surface</div></section>
+<nav id="mobile-drawer" class="drawer" aria-hidden="true" inert>Hidden drawer</nav>
+<div id="modal" class="modal" role="dialog" aria-modal="true"><button>Close</button>Partially clipped modal</div>
+<section class="case flex"><div id="long-url" class="long-url">https://example.test/this/is/a/very/long/unbroken/path/that/cannot/wrap/on/mobile/screens</div></section>
+<section class="case grid"><div id="grid-child" class="grid-child">Grid min-content overflow</div></section>
+<section class="case"><div id="transformed" class="transformed">Transformed content</div></section>
+<div class="dropdown">Inactive dropdown</div>
+<section class="case vertical-scroll" id="vertical-scroll"><div>Intentional vertical scrolling</div></section>
+<div class="decorative-mask" aria-hidden="true"><span>Decorative clipped strip</span></div>
+</body>
+</html>

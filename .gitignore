@@ -1,0 +1,11 @@
+node_modules/
+*.log
+.DS_Store
+# Internal local-only development plans
+/[Dd]ocs/
+# Generated browser audit results and private fixtures
+/reports/
+/.temp/
+.env
+.env.*
+!.env.example

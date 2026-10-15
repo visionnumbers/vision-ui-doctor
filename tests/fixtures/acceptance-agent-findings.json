@@ -1,0 +1,63 @@
+{
+  "summary": {
+    "pagesAudited": 1,
+    "pageFailures": 0,
+    "totalIssues": 7,
+    "backendFailures": 0,
+    "bySeverity": {
+      "high": 1,
+      "medium": 4,
+      "low": 2
+    }
+  },
+  "pages": [
+    {
+      "route": "/",
+      "viewport": "mobile",
+      "issues": [
+        {
+          "kind": "horizontal-document-overflow",
+          "severity": "high",
+          "selector": "html",
+          "detail": "scrollWidth=1136 viewport=375"
+        },
+        {
+          "kind": "element-overflow",
+          "severity": "medium",
+          "selector": "html > body > main.container",
+          "detail": "right=1136 viewport=375"
+        },
+        {
+          "kind": "element-overflow",
+          "severity": "medium",
+          "selector": "html > body > main.container > h1",
+          "detail": "right=1124 viewport=375"
+        },
+        {
+          "kind": "element-overflow",
+          "severity": "medium",
+          "selector": "html > body > main.container > p",
+          "detail": "right=1124 viewport=375"
+        },
+        {
+          "kind": "missing-image-alt",
+          "severity": "low",
+          "selector": "html > body > main.container > img",
+          "detail": "Missing alt attribute"
+        },
+        {
+          "kind": "unlabeled-form-control",
+          "severity": "medium",
+          "selector": "html > body > main.container > input",
+          "detail": "Missing accessible label"
+        },
+        {
+          "kind": "small-touch-target",
+          "severity": "low",
+          "selector": "html > body > main.container > button",
+          "detail": "16x15"
+        }
+      ]
+    }
+  ]
+}
