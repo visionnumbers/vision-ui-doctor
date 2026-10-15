@@ -1,14 +1,13 @@
 import {spawn} from 'node:child_process';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from 'node:net';
 import {resolveBrowserExecutable} from './browser-locator.js';
+import {stopOwnedProcess,removeOwnedProfile} from './browser-cleanup.js';
 
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const hasExited=child=>child.exitCode!==null||child.signalCode!=null;
-const waitForExit=(child,timeoutMs)=>hasExited(child)?Promise.resolve(true):new Promise(resolve=>{const timer=setTimeout(()=>{cleanup();resolve(false);},timeoutMs);const exited=()=>{cleanup();resolve(true);};const cleanup=()=>{clearTimeout(timer);child.off('exit',exited);};child.once('exit',exited);});
-const processAlive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}};
 
 export class StageTimeoutError extends Error{
  constructor(stage,timeoutMs,route){super(`${stage} timed out after ${timeoutMs} ms${route?` for ${route}`:''}`);this.name='StageTimeoutError';this.code='VUD_TIMEOUT';this.stage=stage;this.route=route;this.timeoutMs=timeoutMs;}
@@ -34,26 +33,17 @@ async function poll(url,timeoutMs,startupFailure){
  throw startupFailure()||new StageTimeoutError('Browser startup',timeoutMs);
 }
 
-async function killProcessTree(child,timeoutMs){
- if(!child.pid||hasExited(child))return;
- child.kill('SIGTERM');
- if(await waitForExit(child,Math.min(1000,timeoutMs)))return;
- if(!processAlive(child.pid))return;
- if(process.platform==='win32'){
-  const killer=spawn('taskkill',['/pid',String(child.pid),'/t','/f'],{stdio:'ignore',windowsHide:true});
-  await waitForExit(killer,Math.min(2000,timeoutMs));
- }else child.kill('SIGKILL');
- if(!processAlive(child.pid))return;
- if(!await waitForExit(child,timeoutMs)&&processAlive(child.pid))throw new Error(`Browser shutdown timed out after ${timeoutMs} ms for owned PID ${child.pid}`);
-}
-
-export async function browserSession({chromium,timeout=12000,operationTimeout=10000,shutdownTimeout=5000,signalTarget=process,launch=spawn}={}){
+export async function browserSession({chromium,timeout=12000,operationTimeout=10000,shutdownTimeout=5000,signalTarget=process,launch=spawn,stopProcess=stopOwnedProcess,removeProfile=removeOwnedProfile}={}){
  const executable=resolveBrowserExecutable({explicit:chromium});
  const port=await freePort();
  const profilePath=await mkdtemp(join(tmpdir(),'vision-ui-doctor-'));
  let child;
  try{child=launch(executable,['--headless=new',...(process.env.VISION_UI_NO_SANDBOX==='1'?['--no-sandbox']:[]),'--no-first-run','--no-default-browser-check','--no-proxy-server','--disable-background-networking','--disable-extensions','--disable-dev-shm-usage','--remote-allow-origins=*','--remote-debugging-address=127.0.0.1',`--remote-debugging-port=${port}`,`--user-data-dir=${profilePath}`,'about:blank'],{stdio:['ignore','ignore','pipe'],windowsHide:true});}
- catch(error){await rm(profilePath,{force:true,recursive:true});throw new Error(`Browser startup launch failed (${error.code||'spawn error'})`);}
+ catch(error){await removeProfile(profilePath);throw new Error(`Browser startup launch failed (${error.code||'spawn error'})`);}
+ // 'exit' may precede closure of pipes inherited by Chrome's child processes.
+ let resolveProcessClosed;
+ const processClosed=new Promise(resolve=>{resolveProcessClosed=resolve;});
+ child.once('close',resolveProcessClosed);
  // Never emit raw browser stderr: it can contain URLs, profile paths or page data.
  let stderr='',stderrHead='',spawnError;
  const capture=chunk=>{const text=chunk.toString();stderrHead=(stderrHead+text).slice(0,8192);stderr=(stderr+text).slice(-8192);};
@@ -64,7 +54,7 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
   return /no usable sandbox|sandbox.*(failed|not supported)|namespace.*(failed|not permitted)|operation not permitted/i.test(text)?'Chromium sandbox unavailable; check host user-namespace/AppArmor policy':/error while loading shared libraries/i.test(text)?'Chromium shared library missing':/address already in use/i.test(text)?'DevTools port unavailable':/crashpad.*(required|failed)/i.test(text)?'Chromium crash handler failed':'No recognized Chrome diagnostic (raw stderr withheld)';
  };
  const startupFailure=()=>spawnError?new Error(`Browser startup launch failed (${spawnError})`):hasExited(child)?new Error(`Browser startup exited (code ${child.exitCode??'none'}, signal ${child.signalCode??'none'}); ${diagnostics()}`):null;
- const tabs=new Set();let closePromise=null,closed=false,resolveInterrupted,rejectInterrupted;
+ const tabs=new Set();let closePromise=null,closed=false,resolveInterrupted,rejectInterrupted,browserTarget;
  const interrupted=new Promise((resolve,reject)=>{resolveInterrupted=resolve;rejectInterrupted=reject;});
  const signalHandlers=new Map();
 
@@ -74,9 +64,19 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
   closePromise=(async()=>{
    removeSignalHandlers();const errors=[];
    for(const tab of [...tabs])try{await tab.close();}catch(error){errors.push(error);}
-   try{await killProcessTree(child,shutdownTimeout);}catch(error){errors.push(error);}
+   let stopped=false,graceful=Boolean(browserTarget),gracefulError;
+   if(browserTarget&&!hasExited(child))try{
+    const control=await cdpSocket(browserTarget,{timeoutMs:shutdownTimeout,closeMethod:'Browser.close'});
+    await control.close();graceful=true;
+   }catch(error){gracefulError=error;}
+   try{
+    await stopProcess(child,{timeoutMs:shutdownTimeout,graceful});
+    if(child.stdio)await withStageTimeout(processClosed,{stage:'Browser process streams shutdown',timeoutMs:shutdownTimeout});
+    stopped=true;
+   }catch(error){if(gracefulError)errors.push(gracefulError);errors.push(error);}
+   child.off('close',resolveProcessClosed);
    child.stderr?.off('data',capture);child.stderr?.destroy();child.off('error',launchError);stderr='';stderrHead='';
-   try{await rm(profilePath,{force:true,recursive:true,maxRetries:3,retryDelay:100});}catch(error){errors.push(new Error(`Temporary browser profile cleanup failed: ${error.message}`));}
+   if(stopped)try{await removeProfile(profilePath);}catch(error){errors.push(error);}
    closed=true;
    if(errors.length)throw new AggregateError(errors,'Browser cleanup failed');
   })();
@@ -87,7 +87,7 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
   signalHandlers.set(signal,handler);signalTarget?.once?.(signal,handler);
  }
 
- try{await poll(`http://127.0.0.1:${port}/json/version`,timeout,startupFailure);}catch(error){
+ try{browserTarget=(await poll(`http://127.0.0.1:${port}/json/version`,timeout,startupFailure)).webSocketDebuggerUrl;}catch(error){
   const diagnostic=diagnostics();
   let cleanupError;try{await close();}catch(caught){cleanupError=caught;}
   const suffix='Install Chromium or supply --chromium /path/to/browser';
@@ -106,7 +106,7 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
  return {tab,close,interrupted,pid:child.pid,profilePath,get closed(){return closed;},get openTabCount(){return tabs.size;}};
 }
 
-export async function cdpSocket(url,{timeoutMs=10000,onClose=()=>{}}={}){
+export async function cdpSocket(url,{timeoutMs=10000,onClose=()=>{},closeMethod='Page.close'}={}){
  const ws=new WebSocket(url);const pending=new Map();let next=0,closed=false,closePromise=null;
  let opened,failed,disconnected;
  try{await withStageTimeout(new Promise((resolve,reject)=>{
@@ -133,7 +133,7 @@ export async function cdpSocket(url,{timeoutMs=10000,onClose=()=>{}}={}){
   closePromise=(async()=>{
    if(closed)return;
    let error,finished;
-   try{await send('Page.close');}catch(caught){const forcedFallback=caught.code==='VUD_TIMEOUT'&&/CDP Page\.close/.test(caught.message);if(!forcedFallback&&!/connection closed|websocket error|not attached to an active page/i.test(caught.message))error=caught;}
+   try{await send(closeMethod);}catch(caught){const forcedFallback=caught.code==='VUD_TIMEOUT'&&caught.stage===`CDP ${closeMethod}`;if(!forcedFallback&&!/connection closed|websocket error|not attached to an active page/i.test(caught.message))error=caught;}
    finally{if(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING)ws.close();}
    try{await withStageTimeout(new Promise(resolve=>{finished=resolve;if(closed)resolve();else ws.addEventListener('close',finished,{once:true});}),{stage:'CDP tab shutdown',timeoutMs});}
    finally{ws.removeEventListener('close',finished);}

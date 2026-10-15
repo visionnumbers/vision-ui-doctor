@@ -32,7 +32,8 @@ export async function audit({url,routes=['/'],viewports=['small','mobile','table
  if(!Number.isInteger(timeoutMs)||timeoutMs<250||timeoutMs>60000)throw Error('Timeout must be an integer from 250 to 60000 ms');
  const routeTargets=routes.map(route=>({route,pageUrl:safeRoute(url,route),reportRoute:redactRoute(route,url)}));
  const tasks=routeTargets.flatMap(route=>viewports.map(viewport=>({...route,viewport})));
- await mkdir(out,{recursive:true});const browser=await browserFactory({chromium,timeout:browserStartupTimeoutMs,operationTimeout:Math.max(timeoutMs,2000),shutdownTimeout:Math.max(1000,Math.min(timeoutMs,5000))});let pages;
+ // Cleanup owns its existing budget even when a page intentionally times out quickly.
+ await mkdir(out,{recursive:true});const browser=await browserFactory({chromium,timeout:browserStartupTimeoutMs,operationTimeout:Math.max(timeoutMs,2000),shutdownTimeout:5000});let pages;
  try{
   if(login)await authenticate(browser,{baseUrl:url,timeoutMs,...login});
   pages=await runBounded(tasks,concurrency,async({pageUrl,reportRoute,viewport},index)=>{
