@@ -211,9 +211,17 @@ sanitized diagnostic categories; raw Chrome stderr is never printed.
 
 MIT license. This is a diagnostic development tool, not a penetration-testing suite or source-code repair guarantee.
 
-Browser shutdown closes page sockets, requests Chromium's `Browser.close`, and
-waits for process and inherited-stream closure before deleting its isolated
-temporary profile. Windows force termination is scoped to the owned process tree.
+Browser shutdown closes page sockets, then waits for process and inherited-stream
+closure before deleting its isolated temporary profile. On Windows it terminates
+the exact owned tree using `taskkill /T /F` while its root is still alive, rather
+than first issuing `Browser.close`: early root exit can leave a descendant holding
+stderr open and makes a later PID-based tree command unsafe. Other platforms keep
+the graceful `Browser.close` path. Already-exited root PIDs are never targeted;
+an unclosed inherited pipe remains a bounded, explicit failure with the profile
+retained. Stream closure is not universal proof that no pipe-free orphan exists:
+the current launcher has no Windows Job Object handle. Atomic ownership across
+unexpected root exit would require a narrowly scoped native job-based launcher,
+not broad process-name killing or stale-PID retries.
 Cleanup stages retain their own five-second budget when navigation times out sooner.
 Transient `EBUSY`, `EPERM` and `ENOTEMPTY` removal failures have six bounded retries
 (2.1 seconds of total backoff). Exhausted cleanup rejects with the stage, error

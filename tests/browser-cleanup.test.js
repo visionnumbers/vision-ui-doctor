@@ -125,7 +125,7 @@ test('parent exit during graceful wait is rechecked before any PID-based tree co
  await stopOwnedProcess(browser,{platform:'win32',graceful:true,isAlive:()=>true,launch:()=>assert.fail('Exited owned handle must win over a stale or reused numeric PID')});
 });
 
-async function fakeSession(t,{stopProcess,removeProfile,browserEndpoint=false,nativePipes=false,shutdownTimeout=5000}={}){
+async function fakeSession(t,{stopProcess,removeProfile,browserEndpoint=false,nativePipes=false,shutdownTimeout=5000,platform='linux'}={}){
  const signals=new EventEmitter(),sockets=[],methods=[],browserChild=child();
  if(nativePipes)browserChild.stdio=[];
  const Original=globalThis.WebSocket;
@@ -137,7 +137,7 @@ async function fakeSession(t,{stopProcess,removeProfile,browserEndpoint=false,na
  }
  globalThis.WebSocket=Socket;t.after(()=>{globalThis.WebSocket=Original;});
  t.mock.method(globalThis,'fetch',async url=>({ok:true,json:async()=>String(url).includes('/json/new')?{webSocketDebuggerUrl:'ws://127.0.0.1/fake'}:browserEndpoint?{webSocketDebuggerUrl:'ws://127.0.0.1/browser'}:{}}));
- const browser=await browserSession({chromium:process.execPath,launch:()=>browserChild,signalTarget:signals,stopProcess,removeProfile,shutdownTimeout});
+ const browser=await browserSession({chromium:process.execPath,launch:()=>browserChild,signalTarget:signals,stopProcess,removeProfile,shutdownTimeout,platform});
  t.after(()=>rm(browser.profilePath,{recursive:true,force:true}));
  return {browser,signals,sockets,methods,browserChild};
 }
@@ -149,6 +149,31 @@ test('all page sockets close before graceful Browser.close and verified process/
  assert.deepEqual(fixture.methods,['Page.close','Page.close','Browser.close']);
  assert.ok(fixture.sockets.every(ws=>ws.readyState===3));
  await assert.rejects(lstat(fixture.browser.profilePath),{code:'ENOENT'});
+});
+
+test('Windows keeps the owned root alive until tree termination, then drains inherited streams before profile removal',async t=>{
+ let release,removed=false;const treeStopped=new Promise(resolve=>{release=resolve;});
+ const fixture=await fakeSession(t,{platform:'win32',browserEndpoint:true,nativePipes:true,
+  stopProcess:async(child,options)=>{
+   assert.equal(child.exitCode,null,'Browser.close must not orphan descendants before taskkill can target the live owned tree');
+   assert.equal(options.graceful,false);assert.equal(options.platform,'win32');
+   child.exitCode=0;child.emit('exit',0,null);release();
+  },removeProfile:async path=>{removed=true;await removeOwnedProfile(path);}});
+ await fixture.browser.tab();await fixture.browser.tab();
+ const closing=fixture.browser.close();assert.equal(fixture.browser.close(),closing);
+ // Race with rejection so the original implementation fails instead of hanging.
+ await Promise.race([treeStopped,closing]);
+ assert.deepEqual(fixture.methods,['Page.close','Page.close']);
+ assert.equal(removed,false,'Root exit is not stream/tree completion');
+ fixture.browserChild.emit('close',0,null);await closing;
+ assert.equal(removed,true);await assert.rejects(lstat(fixture.browser.profilePath),{code:'ENOENT'});
+});
+
+test('Windows live-tree shutdown failure retains the profile and does not fall back to root-only Browser.close',async t=>{
+ const fixture=await fakeSession(t,{platform:'win32',browserEndpoint:true,stopProcess:async()=>{throw new Error('Owned tree not verified');}});
+ const closing=fixture.browser.close();await assert.rejects(closing,AggregateError);
+ assert.equal(fixture.browser.close(),closing);assert.deepEqual(fixture.methods,[]);
+ assert.ok(await lstat(fixture.browser.profilePath));
 });
 
 test('close settles all tabs and process termination before profile deletion; idempotent',async t=>{
@@ -189,6 +214,28 @@ test('inherited streams that never close reject within their bound and retain pr
  const fixture=await fakeSession(t,{nativePipes:true,shutdownTimeout:20,stopProcess:async child=>{child.exitCode=0;},removeProfile:async()=>{removed=true;}});
  await assert.rejects(fixture.browser.close(),error=>error.errors.some(item=>item.code==='VUD_TIMEOUT'&&item.stage==='Browser process streams shutdown'));
  assert.equal(removed,false);assert.equal(fixture.browserChild.listenerCount('close'),0);assert.ok(await lstat(fixture.browser.profilePath));
+});
+
+test('Windows already-exited owned root with an inherited pipe remains bounded and never targets its stale PID',async t=>{
+ const fixture=await fakeSession(t,{platform:'win32',nativePipes:true,shutdownTimeout:20,
+  stopProcess:async child=>{
+   child.exitCode=0;child.emit('exit',0,null);
+   await stopOwnedProcess(child,{platform:'win32',launch:()=>assert.fail('Never signal exited root PID')});
+  }});
+ const closing=fixture.browser.close();
+ await assert.rejects(closing,error=>error.errors.some(item=>item.stage==='Browser process streams shutdown'&&item.code==='VUD_TIMEOUT'));
+ assert.equal(fixture.browser.close(),closing);assert.ok(await lstat(fixture.browser.profilePath));
+});
+
+test('child close just before the virtual shutdown deadline settles and removes its timer',async t=>{
+ let release;const stopped=new Promise(resolve=>{release=resolve;});
+ const fixture=await fakeSession(t,{platform:'win32',nativePipes:true,shutdownTimeout:5000,
+  stopProcess:async child=>{child.exitCode=0;child.emit('exit',0,null);release();}});
+ t.mock.timers.enable({apis:['setTimeout']});
+ const closing=fixture.browser.close();await stopped;await Promise.resolve();
+ t.mock.timers.tick(4999);fixture.browserChild.emit('close',0,null);await closing;
+ t.mock.timers.tick(1);await assert.rejects(lstat(fixture.browser.profilePath),{code:'ENOENT'});
+ assert.equal(fixture.browserChild.listenerCount('close'),0);
 });
 
 test('Windows-style interrupt settles multiple tabs, processes and profile before interrupted resolves',async t=>{
