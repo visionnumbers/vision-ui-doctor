@@ -33,7 +33,7 @@ async function poll(url,timeoutMs,startupFailure){
  throw startupFailure()||new StageTimeoutError('Browser startup',timeoutMs);
 }
 
-export async function browserSession({chromium,timeout=12000,operationTimeout=10000,shutdownTimeout=5000,signalTarget=process,launch=spawn,stopProcess=stopOwnedProcess,removeProfile=removeOwnedProfile}={}){
+export async function browserSession({chromium,timeout=12000,operationTimeout=10000,shutdownTimeout=5000,signalTarget=process,launch=spawn,stopProcess=stopOwnedProcess,removeProfile=removeOwnedProfile,platform=process.platform}={}){
  const executable=resolveBrowserExecutable({explicit:chromium});
  const port=await freePort();
  const profilePath=await mkdtemp(join(tmpdir(),'vision-ui-doctor-'));
@@ -64,13 +64,16 @@ export async function browserSession({chromium,timeout=12000,operationTimeout=10
   closePromise=(async()=>{
    removeSignalHandlers();const errors=[];
    for(const tab of [...tabs])try{await tab.close();}catch(error){errors.push(error);}
-   let stopped=false,graceful=Boolean(browserTarget),gracefulError;
-   if(browserTarget&&!hasExited(child))try{
+   // On Windows taskkill /T needs the live owned root to discover its tree.
+   // Browser.close can orphan a pipe-holding descendant before that command.
+   // Keep tabs/socket cleanup, but terminate the live tree before root exit.
+   let stopped=false,graceful=platform!=='win32'&&Boolean(browserTarget),gracefulError;
+   if(platform!=='win32'&&browserTarget&&!hasExited(child))try{
     const control=await cdpSocket(browserTarget,{timeoutMs:shutdownTimeout,closeMethod:'Browser.close'});
     await control.close();graceful=true;
    }catch(error){gracefulError=error;}
    try{
-    await stopProcess(child,{timeoutMs:shutdownTimeout,graceful});
+    await stopProcess(child,{timeoutMs:shutdownTimeout,graceful,platform});
     if(child.stdio)await withStageTimeout(processClosed,{stage:'Browser process streams shutdown',timeoutMs:shutdownTimeout});
     stopped=true;
    }catch(error){if(gracefulError)errors.push(gracefulError);errors.push(error);}
