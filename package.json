@@ -4,7 +4,8 @@
   "description": "Local-first multi-route responsive UI auditing, form-login support, endpoint checks and agent markdown report",
   "type": "module",
   "bin": {
-    "vision-ui-doctor": "./src/cli.js"
+    "vision-ui-doctor": "./src/cli.js",
+    "vision-ui-doctor-public": "./src/public-cli.js"
   },
   "scripts": {
     "test": "node --test --test-concurrency=1",

@@ -1,0 +1,4 @@
+body { margin: 16px; font: 16px system-ui; }
+nav a { display: inline-block; min-height: 24px; padding: 4px; }
+#wide { width: 900px; padding: 0; background: #dceeff; }
+#sibling { width: 100%; background: #eeffdc; }

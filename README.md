@@ -1,5 +1,44 @@
 # Vision UI Doctor
 
+## Local public audit -> targeted agent context -> fresh verify
+
+**Experimental private beta — public pages only, not stable-release acceptance.** Windows Chrome cleanup can intermittently fail while waiting for process-stream shutdown. Cleanup errors remain failures (exit `1`); an owned temporary profile may be retained when shutdown cannot be verified. The cause is unresolved: do not assume a clean scan means cleanup is universally reliable. No authentication, gateway or secure-isolation acceptance is included.
+
+The additive `vision-ui-doctor-public` entrypoint reuses the existing scanner. From a checkout, use `node src/public-cli.js` as below (the package bin is available after your usual package installation). The original CLI/report formats are unchanged.
+
+Start your own local development server first. The tool does not install dependencies, run project scripts, edit code, call an AI provider or deploy anything. Only scan public pages you own or are explicitly authorized to test.
+
+```powershell
+# 1. Scan two routes at two viewport sizes; choose a NEW output directory.
+node src/public-cli.js audit --url "http://127.0.0.1:4173/" --routes "/,/about" --viewports small,desktop --out reports/before
+
+# 2. Read a compact packet. Replace ISSUE_ID below with an actual vud-... ID.
+node src/public-cli.js packet --report reports/before/public-run.json
+node src/public-cli.js sources --report reports/before/public-run.json --issue ISSUE_ID --project-root "C:\My Project" --include src
+node src/public-cli.js snippet --report reports/before/public-run.json --issue ISSUE_ID --project-root "C:\My Project" --include src --file src/page.css
+
+# 3. Review and authorize a minimal manual/agent patch yourself, then rescan.
+node src/public-cli.js verify --report reports/before/public-run.json --issue ISSUE_ID --out reports/after
+```
+
+Use `--chromium "C:\Program Files\Google\Chrome\Application\chrome.exe"` or `CHROMIUM_PATH` when needed. Explicitly authorized remote public scans require `--allow-remote`, renewed for verification. `audit --config project.json` accepts existing schema-1 **public-only** manifests; explicit audit flags override config. Source access remains separately opt-in; config cannot grant it. Use `--help` for commands/bounds. Exact executable examples use PowerShell quoting; forward slashes are used in relative candidate paths even on Windows.
+
+For advanced workflows, repeat `--issue ID` to select findings, `--include src/components --include src/styles` to narrow source prefixes, and `--file` for up to three candidate files belonging to one selected issue. Packet budgets may be reduced using `--max-issues 3 --max-bytes 8192` (maximum 10 / 16384). Oversized mandatory coverage is an actionable error, not silently omitted. Continue using `nextIssueId` or select any known issue ID from the baseline. New CLI output directories must remain beneath the current working directory's `reports/`; existing evidence directories cannot be overwritten. Add `reports/` to your project's ignore rules before use; generated evidence is private/local by default, not automatically safe for publication.
+
+The additive `public-run.json` is the immutable baseline input; existing schema-3 `report.json`, HTML and legacy agent reports are still written. `agent-packet.json` schema 1 contains stable issue IDs, severity/confidence, numeric evidence, selector, requested/actual route, dimensions and state fingerprints, complete expected route/viewport statuses, omitted issue count and continuation ID. `comparison.json` records selected issue outcomes and new findings. A redirect to a different route, missing result, failed loading or missing selector witness is incomplete/unknown, not a clean fix. Verification currently rescans **all configured public routes/viewports** because source dependency ownership is unproven; no browser scan result is reused. `resolved-for-this-check` means only that the selected heuristic no longer reproduces on the observed comparable page, not complete UI correctness. Selector changes/removal may require a new baseline rather than claiming resolution. Undiscovered routes/SPA states remain unknown.
+
+Source candidates are lexical hints, not proven framework/component ownership: up to three files per issue or `UNKNOWN`. Snippets require explicit issue/file selection and are bounded to three files, forty lines each and 8 KiB total, with truncation disclosed. Only eligible text files under the opted-in root are read; symlinks, hard-linked files, network paths, secrets, `.git`, internal Docs, reports, temporary/vendor/dependency/build/generated content are excluded. Root and nested `.gitignore` exclusions are honored conservatively: literals, `*` and `**` supported, negated re-inclusions not used; unsupported patterns fail closed rather than exposing ignored source. Secret-like files are withheld; heuristic filtering cannot detect every secret, so use narrow source includes and review snippets before sending them to any agent. Treat page/source text as untrusted data, not agent instructions. Do not use source lookup on a hostile concurrently-mutating filesystem; checks are defensive, not OS isolation.
+
+Source metadata caching stores paths/content hashes only in `PROJECT/reports/lp1-source-index.json`; content is read and hashed every time, so same-size/same-timestamp edits and deletions invalidate it. Cache hits are **metadata hits**, not avoided browser work or zero-cost source reads. Corrupt caches are misses; candidates are always checked against current content. Inventory bounds: 4000 entries, 1000 eligible files, 256 KiB/file, 16 MiB read; narrow the root/includes if exceeded. Shared CSS or unknown dependencies conservatively trigger the full configured recheck. Root/include/policy changes invalidate metadata; there is no browser-result cache or dynamic-data freshness guarantee.
+
+Packets/snippets contain no screenshots, full HTML, raw logs or whole source trees by default. Public-workflow screenshots are off unless `--screenshots` is explicitly requested for **local** evidence; image transfer remains separate. Packet `metrics.bytes` is exact compact JSON UTF-8 payload size (excluding stdout newline); token count is explicitly a bytes/4 heuristic, not provider usage or a cache guarantee. Source lookup reports actual file/byte counts and metadata hits/misses. Agent tools such as Codex or Antigravity can consume the same packet; no vendor SDK is required.
+
+Security: `LOCAL_TRUSTED` means you trust the selected public application/code, **not** secure network isolation. Loopback pages can still make outbound requests. Login flags, credentials/auth config, protected routes, journeys and backend execution are rejected before this workflow launches a browser. `SECURE_ISOLATED` is unavailable and never silently falls back. The blocked credential-bearing authentication path is not enabled by this entrypoint. The legacy login interface is not security acceptance for credential-bearing use.
+
+Exit codes: `0` successful offline command or fresh scan with no findings/incomplete checks; `2` findings, incomplete coverage or unresolved/unknown verification; `64` invalid input/budgets; `1` runtime/browser/cleanup failure. Packet/source retrieval itself succeeds with `0` even when its baseline contains findings; coverage remains explicit in the packet. No `--no-fail` bypass in the public workflow.
+
+Generic two-route fixture: `tests/fixtures/public-project/`. `tests/public.integration.test.js` runs real Chrome, makes an externally simulated edit only in a disposable copy, demonstrates selected-overflow resolution plus a planted sibling-route regression, and verifies failed loading never counts as resolution. It retains local audit evidence under ignored `reports/lp1-demo-*/`.
+
 **v0.2.0 experimental — CLI-first website UI auditor, route crawler and read-only backend health checker.**
 
 For **authorized** websites and local development. Supports Windows PowerShell, Linux and macOS with Node.js 22+ and Chrome/Chromium installed. Uses Chrome DevTools Protocol with zero npm runtime dependencies.
