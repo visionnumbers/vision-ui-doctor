@@ -18,6 +18,9 @@ If you separately installed/linked this package and its executable is on PATH,
 the same entrypoint is `vision-ui-doctor install`. Existing package metadata maps
 that executable to src/cli.js. This task does not install global software or
 publish a registry package. No `npx vision-ui-doctor` download is advertised.
+For offline tarball installation and verified platform/host boundaries, see the
+[limited-beta guide](beta-installation.md). Prefer its quoted direct Node paths
+when Windows npm wrappers fail or PowerShell script policy blocks them.
 
 The installer probes Node and the public CLI's offline help for DX1 scan support.
 It installs four small files plus an ownership manifest: identical canonical
@@ -155,5 +158,6 @@ other machines. Reinstall/rebind per environment; the installer never commits.
 Before public release, separately approve/version/package and verify the npm
 artifact/executables plus actual host discovery on intended OS/agent versions.
 The package allowlist includes src/skills/guides/examples and public metadata,
-excluding internal Docs/reports/.temp/tests. None of this establishes browser
+excluding internal Docs/reports/.temp and test suites (public test fixtures are
+included for the shipped example servers). None of this establishes browser
 reliability, complete route coverage or stable-release acceptance.

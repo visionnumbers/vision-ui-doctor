@@ -1,7 +1,7 @@
 {
   "name": "vision-ui-doctor",
   "version": "0.2.0",
-  "description": "Local-first multi-route responsive UI auditing, form-login support, endpoint checks and agent markdown report",
+  "description": "Local public UI/UX audits, evidence-based agent handoffs and an ownership-aware Agent Skills installer",
   "type": "module",
   "bin": {
     "vision-ui-doctor": "./src/cli.js",

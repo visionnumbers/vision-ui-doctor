@@ -6,6 +6,10 @@ incomplete coverage remain known limitations.
 
 ## Quick start
 
+For a locally supplied beta tarball, use the [beta installation and limitations
+guide](guides/beta-installation.md). Windows users should use the quoted direct
+Node commands below; generated npm wrappers have environment-specific limitations.
+
 Keep a maintained checkout with Node.js 22+ and Chrome/Chromium. Start your app,
 then invoke the public CLI from your application directory:
 
