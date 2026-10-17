@@ -51,3 +51,10 @@ export async function writeLocalImage(path,data){
  const handle=await open(absolute,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);
  try{await handle.writeFile(data);}finally{await handle.close();}
 }
+
+export async function writeLocalText(path,text,maxBytes=512*1024){
+ if(typeof text!=='string'||Buffer.byteLength(text)>maxBytes)throw usage('Local text report exceeds its byte bound');
+ const absolute=await checkedPath(path,{create:true});
+ const handle=await open(absolute,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);
+ try{await handle.writeFile(text,'utf8');}finally{await handle.close();}
+}

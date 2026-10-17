@@ -7,6 +7,7 @@
     "vision-ui-doctor": "./src/cli.js",
     "vision-ui-doctor-public": "./src/public-cli.js"
   },
+  "files": ["src/", "skills/", "guides/", "examples/", "tests/fixtures/", "README.md", "LICENSE"],
   "scripts": {
     "test": "node --test --test-concurrency=1",
     "audit:demo": "node src/cli.js audit --url http://127.0.0.1:4173 --out reports/demo"

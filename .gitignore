@@ -6,6 +6,8 @@ node_modules/
 # Generated browser audit results and private fixtures
 /reports/
 /.temp/
+# Local installer-managed skill; canonical source lives under /skills/
+/.agents/skills/vision-ui-doctor/
 .env
 .env.*
 !.env.example

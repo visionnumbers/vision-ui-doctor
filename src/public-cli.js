@@ -3,15 +3,16 @@ import {parseArgs} from 'node:util';
 import {readFileSync} from 'node:fs';
 import {lstat} from 'node:fs/promises';
 import {resolve,join,relative} from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 import {parseCliArgs} from './cli.js';
 import {loadProjectConfig} from './config.js';
 import {discoverRoutes} from './site.js';
 import {routeFromUrl} from './url.js';
 import {guardPublicOptions,scanPublic,createPacket,verifyPublic,publicStates,selectedIssues,usage,classifyPublicError} from './public-workflow.js';
 import {lookupSources,readSnippets} from './public-source.js';
-import {readJson,writeJson,writeLocalImage,checkedPath,within} from './public-files.js';
+import {readJson,writeJson,writeLocalImage,writeLocalText,checkedPath,within} from './public-files.js';
 import {scanSpa,spaStates,spaIssues,spaPacket,compareSpaRuns,validateSpaConfig} from './spa-workflow.js';
+import {renderDeveloperReports} from './developer-report.js';
 
 const VERSION=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;
 const auditFlags=['url','routes','config','viewports','chromium','timeout-ms','wait-ms','concurrency','max-routes','discover','allow-remote','screenshots','no-screenshots'];
@@ -31,6 +32,8 @@ Use only a dev server/site you own or are explicitly authorized to audit. No cre
   vision-ui-doctor-public verify --report reports/before/public-run.json --issue ID --out reports/after [--chromium PATH]
   vision-ui-doctor-public spa-audit --config spa.json --out reports/spa-before [--chromium PATH] [--screenshots]
   vision-ui-doctor-public spa-verify --report reports/spa-before/public-run.json --issue ID --out reports/spa-after [--chromium PATH] [--screenshots]
+  vision-ui-doctor-public scan --url http://localhost:5173 --out reports/scan [--project-root PATH]
+  vision-ui-doctor-public scan --config public-spa.json --out reports/scan [--screenshots]
 
 audit reuses existing public CLI/config/discovery options; CLI > config > defaults.
 Screenshots default OFF in this workflow; --screenshots opts into local capture only.
@@ -48,29 +51,81 @@ SPA screenshots are opt-in local viewport PNGs; no pixel diff or AI image upload
 Protected/auth/M2 journeys/backend execution and SECURE_ISOLATED are unavailable.
 Exits: 0 successful command/no findings; 2 findings/incomplete/unknown verification; 64 invalid input; 1 runtime/cleanup failure.
 Existing vision-ui-doctor entrypoint remains unchanged. No AI API or automatic patches.
+scan: auto-discover same-origin anchors unless --routes supplies explicit scope; public defaults small,desktop.
+scan --config reuses public SPA config/states (do not combine with URL/routes/runtime overrides).
+scan writes REPORT.md, AGENT_HANDOFF.md (<=16 KiB), scan-status.json and public-run.json when the engine completes.
+Source candidates require --project-root; optional --include narrows lookup. No target metadata-cache writes.
+Undiscovered routes and unconfigured interactive states remain unknown; runtime/cleanup failures produce failure reports.
 `;
 
 function number(value,fallback,max){if(value===undefined)return fallback;if(!/^\d+$/.test(value)||Number(value)<1||Number(value)>max)throw usage('Invalid bounded numeric option');return Number(value);}
-async function outputDirectory(value){
+async function outputDirectory(value,extraFiles=[]){
  const out=resolve(value??'reports/public');if(!within(resolve('reports'),out))throw usage('Output must be beneath ./reports, never a source directory');
  await checkedPath(out,{directory:true,create:true});
  // Preserve immutable baseline evidence and prevent report collisions.
- const entries=['public-run.json','report.json','report.html','agent-packet.json'];
+ const entries=['public-run.json','report.json','report.html','agent-packet.json',...extraFiles];
  for(const file of entries)try{await lstat(join(out,file));throw usage('Output already contains evidence; choose a fresh --out directory');}catch(error){if(error.code!=='ENOENT')throw error;}
  return out;
 }
 
-export async function runPublicCli(argv,{stdout=message=>console.log(message),stderr=message=>console.error(message),scanFn=scanPublic,verifyFn=verifyPublic,discoverFn=discoverRoutes}={}){
+export async function runPublicCli(argv,{stdout=message=>console.log(message),stderr=message=>console.error(message),scanFn=scanPublic,verifyFn=verifyPublic,discoverFn=discoverRoutes,spaFn=scanSpa}={}){
  let parsed;
  try{parsed=parseArgs({args:argv,options:schema,strict:true,allowPositionals:true});}catch{stderr('public: invalid/unknown option or missing value; use --help (input withheld)');return 64;}
  const {values,positionals}=parsed;
  if(values.help||!argv.length){stdout(publicHelp);return 0;}
  if(values.version){stdout(VERSION);return 0;}
  try{
-  if(positionals.length!==1||!['audit','packet','sources','snippet','verify','spa-audit','spa-verify'].includes(positionals[0]))throw usage('Choose audit, spa-audit, packet, sources, snippet, verify or spa-verify; see --help');
+  if(positionals.length!==1||!['audit','packet','sources','snippet','verify','spa-audit','spa-verify','scan'].includes(positionals[0]))throw usage('Choose scan, audit, spa-audit, packet, sources, snippet, verify or spa-verify; see --help');
   const command=positionals[0];
-  const allowed={audit:[...auditFlags,'out','mode'],'spa-audit':['config','out','chromium','allow-remote','screenshots'],'spa-verify':['report','issue','out','chromium','allow-remote','screenshots'],packet:['report','issue','max-issues','max-bytes'],sources:['report','issue','project-root','include'],snippet:['report','issue','project-root','include','file'],verify:['report','issue','out','chromium','allow-remote']}[command];
+  const allowed={scan:[...auditFlags,'out','project-root','include'],audit:[...auditFlags,'out','mode'],'spa-audit':['config','out','chromium','allow-remote','screenshots'],'spa-verify':['report','issue','out','chromium','allow-remote','screenshots'],packet:['report','issue','max-issues','max-bytes'],sources:['report','issue','project-root','include'],snippet:['report','issue','project-root','include','file'],verify:['report','issue','out','chromium','allow-remote']}[command];
   if(Object.keys(values).some(key=>!allowed.includes(key)))throw usage('Option is not supported for this public command; see --help');
+  if(command==='scan'){
+   if(values.include&&!values['project-root'])throw usage('--include requires explicit --project-root consent');
+   if(values.include?.some(p=>!p||p.length>256||p.includes('\\')||p.startsWith('/')||/^[a-z]:/i.test(p)||p.split('/').some(s=>s==='.'||s==='..'))||values.include?.length>20)throw usage('Use at most 20 relative --include prefixes');
+   if(values.screenshots&&values['no-screenshots'])throw usage('Use only one screenshots option');
+   let config,options;
+   if(values.config){
+    if(Object.keys(values).some(k=>!['config','out','chromium','allow-remote','screenshots','no-screenshots','project-root','include'].includes(k)))throw usage('scan --config uses the public SPA schema; do not combine with route/runtime overrides');
+    config=validateSpaConfig(await readJson(values.config),{allowRemote:values['allow-remote']===true});
+   }else{
+    const forwarded=['audit'];for(const flag of auditFlags.filter(f=>f!=='config'))if(values[flag]!==undefined)for(const v of Array.isArray(values[flag])?values[flag]:[values[flag]])forwarded.push(...(typeof v==='boolean'?[`--${flag}`]:[`--${flag}`,v]));
+    options=parseCliArgs(forwarded).options;
+    if(!values.routes)options.routes=[routeFromUrl(options.url)];
+    if(!values.viewports)options.viewports=guardPublicOptions({url:options.url,allowRemote:options.allowRemote}).viewports;
+    options.screenshots=values.screenshots===true;guardPublicOptions(options);
+    if(options.routes.length>options.maxRoutes)throw usage('Explicit routes exceed --max-routes');
+   }
+   if(values['project-root'])try{await checkedPath(values['project-root'],{directory:true});}catch{throw usage('--project-root must be an existing local directory without symlink/reparse ancestors');}
+   const out=await outputDirectory(values.out??'reports/scan',['REPORT.md','AGENT_HANDOFF.md','scan-status.json']);
+   const baseline=join(out,'public-run.json'),cliPath=new URL('./public-cli.js',import.meta.url);
+   let run,discovery={requested:false,errors:0},sourceResults,phase='browser';
+   const render=failure=>renderDeveloperReports({run,baseline,cliPath:resolve(fileURLToPath(cliPath)),discovery,failure,sourceResults,projectRoot:values['project-root']});
+   const save=async rendered=>{await writeLocalText(join(out,'REPORT.md'),rendered.report);await writeLocalText(join(out,'AGENT_HANDOFF.md'),rendered.agent,16384);await writeJson(join(out,'scan-status.json'),{...rendered.status,rootCauseGroups:rendered.rootCauseGroups});};
+   try{
+    if(config)run=await spaFn(config,{chromium:values.chromium,allowRemote:values['allow-remote']===true,captureImage:values.screenshots?(file,data)=>writeLocalImage(join(out,file),data):undefined});
+    else{
+     if(values.discover===true||!values.routes){
+      phase='discovery';const found=await discoverFn({...guardPublicOptions(options),chromium:options.chromium,maxRoutes:options.maxRoutes,login:null});
+      const routes=guardPublicOptions({...options,routes:[...new Set([...options.routes,...found.routes])]}).routes;
+      discovery={requested:true,errors:found.errors?.length??0,cap:options.maxRoutes,capMayHaveLimited:found.routes.length>=options.maxRoutes||routes.length>options.maxRoutes,knownRoutesOmitted:Math.max(0,routes.length-options.maxRoutes)};
+      options.routes=routes.slice(0,options.maxRoutes);
+     }
+     phase='browser';options.out=out;run=await scanFn(options);
+    }
+    phase='artifacts';await writeJson(baseline,run);
+    let rendered=render();
+    if(values['project-root']&&rendered.selectedIssueIds.length){
+     phase='source-lookup';const selected=(config?spaIssues:selectedIssues)(run,rendered.selectedIssueIds).map(i=>({id:i.finding.id,selector:i.finding.selector}));
+     sourceResults=(await lookupSources({root:values['project-root'],issues:selected,include:values.include??[]})).results;rendered=render();
+    }
+    phase='artifacts';await save(rendered);
+    stdout(JSON.stringify({output:relative(resolve('.'),out).split('\\').join('/'),report:'REPORT.md',handoff:'AGENT_HANDOFF.md',...rendered.status}));return rendered.status.outcome;
+   }catch(error){
+    const failure=classifyPublicError(error).map(e=>({...e,phase}));
+    // No synthetic successful baseline after startup/navigation/cleanup failure.
+    await save(render(failure));stderr(`public scan: incomplete workflow ${JSON.stringify(failure)}`);return 1;
+   }
+  }
   if(command==='spa-audit'){
    if(!values.config)throw usage('spa-audit requires --config with a local SPA JSON file');
    const config=validateSpaConfig(await readJson(values.config),{allowRemote:values['allow-remote']===true});

@@ -131,12 +131,13 @@ export function parseCliArgs(argv=[]){
 }
 
 export async function runCli(argv,{auditFn=audit,discoverRoutesFn=discoverRoutes,checkBackendFn=checkBackend,stdout=message=>console.log(message),stderr=message=>console.error(message)}={}){
+ if(['install','uninstall'].includes(argv[0]))return (await import('./install-cli.js')).runInstallerCli(argv,{stdout,stderr});
  let parsed;
  try{parsed=parseCliArgs(argv);}catch(error){
   if(['CLI_USAGE','CONFIG_INVALID'].includes(error?.code)){stderr(`vision-ui-doctor: ${error.message}\nTry 'vision-ui-doctor --help' for usage.`);return EXIT_CODES.INVALID_ARGUMENT;}
   stderr(`vision-ui-doctor: ${error?.message||String(error)}`);return EXIT_CODES.RUNTIME_FAILURE;
  }
- if(parsed.action==='help'){stdout(help+lifecycleHelp+configHelp);return EXIT_CODES.SUCCESS;}
+ if(parsed.action==='help'){stdout(help+lifecycleHelp+configHelp+'\nAgent skills: vision-ui-doctor install [--list|--status] or uninstall; use install --help. No runtime downloads.\n');return EXIT_CODES.SUCCESS;}
  if(parsed.action==='version'){stdout(VERSION);return EXIT_CODES.SUCCESS;}
  if(parsed.action==='validate'){stdout(JSON.stringify({schemaVersion:parsed.project.schemaVersion,status:'valid'}));return EXIT_CODES.SUCCESS;}
  if(parsed.action==='plan'){stdout(JSON.stringify(createExecutionPlan(parsed.project),null,2));return EXIT_CODES.SUCCESS;}

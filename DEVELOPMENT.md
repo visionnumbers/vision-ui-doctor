@@ -6,6 +6,42 @@ do not create a new worktree for each feature or use the dirty authentication WI
 
 Public CLI: `D:\PARTHA\AGENT SKILL & PLUGIN\vision-ui-doctor-dev\src\public-cli.js`.
 
+## Skill source and local installation ownership
+
+Maintain the canonical skill and supporting resources under
+`skills/vision-ui-doctor/`. The project destination
+`.agents/skills/vision-ui-doctor/` belongs to the DX2 installer and is ignored;
+never reintroduce a tracked pointer there or commit its local runtime binding.
+Install with `node src/cli.js install --agent codex --scope project` and check
+with `node .agents/skills/vision-ui-doctor/scripts/vud.mjs --check`.
+Installer ownership/runtime checks do not prove live Codex activation; confirm
+in the host's skill list, reopening the session if discovery has not refreshed.
+
+## DX1 developer workflow
+
+Start a public local development server, then invoke the public CLI from your
+application directory by absolute path:
+
+```powershell
+$vud = 'D:\PARTHA\AGENT SKILL & PLUGIN\vision-ui-doctor-dev\src\public-cli.js'
+node $vud scan --url http://localhost:5173 --out reports/scan
+# Optional local screenshots and explicitly authorized source candidates:
+node $vud scan --url http://localhost:5173 --project-root . --include src --screenshots --out reports/scan-with-source
+# Existing public SPA configuration for actual declared interaction states:
+node $vud scan --config public-spa.json --out reports/spa-scan
+```
+
+Read REPORT.md and share only the bounded AGENT_HANDOFF.md when useful. Full run,
+status/root membership and optional screenshot evidence remain local. Source
+candidates are lexical, not guaranteed ownership; target files/cache are not
+written. Automatic same-origin anchor discovery is capped; explicit `--routes`
+disables it unless `--discover` is also supplied. Public default viewports remain
+small/desktop. Unconfigured routes/interactive states are unknown even if exit0.
+Fresh `verify`/`spa-verify` commands appear for representative returned issue IDs.
+No accepted authentication/isolation boundary or release readiness is implied;
+the existing Windows cleanup limitation remains. Original seven commands and
+existing reports retain their contracts. No commit/publication is automatic.
+
 ## Invoke from any application checkout
 
 Use Node.js 22 or newer and an installed Chromium/Chrome. Open your application
