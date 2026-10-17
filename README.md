@@ -1,94 +1,136 @@
 # Vision UI Doctor
 
-## Public beta: 0.2.0-beta.1
+**Find website UI problems. Understand the report. Fix what matters.**
 
-Local public website UI/UX audits and an Agent Skills installer for Codex, Claude
-Code, Gemini CLI, Antigravity IDE and Cursor. Experimental; browser cleanup and
-incomplete coverage remain known limitations. Feedback and minimal reproductions
-are welcome through GitHub bug reports and feature requests. Not a stable release.
+[Public beta v0.2.0-beta.1](https://github.com/visionnumbers/vision-ui-doctor/releases/tag/v0.2.0-beta.1) · [npm](https://www.npmjs.com/package/vision-ui-doctor) · [Report a bug](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=bug_report.md)
 
-## Quick start
+Vision UI Doctor is a **local Node.js tool** that checks public website layouts at different screen sizes and generates readable reports. You can use it yourself or install its **Agent Skill** in Codex, Claude Code, Gemini CLI, Antigravity, or Cursor to help an AI coding agent interpret the findings.
 
-Use Node.js 22+ and an independently installed Chrome/Chromium. After this beta
-has been published, install it without a global npm installation (Windows
-PowerShell; use a fresh durable prefix):
+**Simple workflow:** Scan → Read → Approve a fix → Scan again.
+
+> **Public beta:** Expect occasional browser timeouts and incomplete coverage. A clean result does **not** mean every page or interaction is bug-free. The tool does not automatically modify your website.
+
+## 🚀 Start here (Windows PowerShell)
+
+**You need:** Node.js **22 or newer**, Chrome or Chromium installed, and a **local public website** you can open in your browser. You do not need to know Git or clone this repository.
+
+### 1. Install Vision UI Doctor
+
+Open **PowerShell** and paste the following commands, one block at a time:
 
 ```powershell
 $prefix = 'D:\Tools\vision-ui-doctor-beta'
 npm.cmd install --prefix $prefix --global=false --ignore-scripts --no-audit --no-fund --no-package-lock --save=false vision-ui-doctor@0.2.0-beta.1
-$runtime = Join-Path $prefix 'node_modules/vision-ui-doctor'
-$vud = Join-Path $runtime 'src/public-cli.js'
-$installer = Join-Path $runtime 'src/cli.js'
+$vud = Join-Path $prefix 'node_modules/vision-ui-doctor/src/public-cli.js'
+$installer = Join-Path $prefix 'node_modules/vision-ui-doctor/src/cli.js'
 node $vud --version
-# Start your public app's dev server, then run from its directory:
+```
+
+If you see a version number, the CLI is installed. Keep `$vud` and `$installer` in **this same PowerShell window** for the next steps.
+
+### 2. Start your own website
+
+In a **separate terminal**, start your website as you normally do (for example, `npm run dev`). Open it in Chrome and note its URL, such as:
+
+`http://localhost:5173`
+
+That address is **only an example**. Replace it with your own local website URL.
+
+### 3. Run your first scan
+
+Back in the **first PowerShell window**, paste:
+
+```powershell
 node $vud scan --url http://localhost:5173 --out reports/scan
 ```
 
-The agent reads `scan-status.json` and compact `AGENT_HANDOFF.md` first, then
-explains the important evidence. Reports/images stay local. Additional routes and
-SPA states need explicit scope; a clean result does not certify the whole site.
+Change `http://localhost:5173` if your website uses a different port.
 
-## Install the agent skill
+A scan can return findings or a nonzero exit code when some states fail. Read the report rather than assuming failure means the website itself is broken.
 
-From your application directory, using the installed runtime above (interactive):
+### 4. Open your results
+
+Your output folder contains:
+
+| File | What it is for |
+| --- | --- |
+| `REPORT.md` | **Start here.** Human-readable findings and coverage |
+| `AGENT_HANDOFF.md` | Compact evidence for a coding agent |
+| `scan-status.json` | Machine-readable scan outcome |
+| `public-run.json` | Detailed baseline when the scan completes |
+
+To open the beginner-friendly report in Notepad:
 
 ```powershell
-node $installer install
+notepad reports/scan/REPORT.md
 ```
 
-If this local package is already installed/linked on PATH, use
-`vision-ui-doctor install`. The skill installer itself performs no registry
-download or global install. It binds this existing scanner, not Node/Chrome.
-Windows Direct-Node invocation is the verified workaround for generated wrapper
-limitations. Do not bypass PowerShell execution policy. Source checkout users can
-instead define $vud and $installer as absolute src/public-cli.js and src/cli.js paths.
+**Check incomplete/skipped states** before deciding that a problem has been fixed.
 
-| Agent | Explicit install example (after defining $installer) | Confirm discovery |
-| --- | --- | --- |
-| Codex | `node $installer install --agent codex --scope project` | `/skills` or `$vision-ui-doctor` |
-| Claude Code | `node $installer install --agent claude-code --scope project` | `/vision-ui-doctor` |
-| Gemini CLI | `node $installer install --agent gemini-cli --scope user` | `/skills reload`, `/skills list` |
-| Antigravity IDE | `node $installer install --agent antigravity --scope user` | Customizations in agent side panel |
-| Cursor | `node $installer install --agent cursor --scope project` | Customize > Skills |
+## 🤖 Want your AI coding agent to help?
 
-Project means the invoking directory (or `--project-root PATH`); user/global means
-the OS user home. Multiple selection: `--agent codex,gemini-cli,cursor`.
-Inspect with `install --list` or `install --status --scope project`; remove owned
-files with `uninstall --agent codex --scope project`. Collisions/modified files are
-preserved. Actual host/version discovery must still be confirmed.
+Vision UI Doctor includes an **Agent Skill**. The skill gives your agent instructions to use the already installed scanner, explain findings, ask before editing, and verify approved fixes.
 
-Then ask your agent: **“Audit my website UI, explain the important problems and
-help fix them.”** The skill invokes the existing public scanner. Application
-edits require explicit authorization and fresh verification; nothing is committed,
-uploaded or deployed automatically.
+Open a terminal in **your website's project folder**, then install the skill for the agent you use:
 
-[Installer destinations, official sources and safety](guides/agent-installation.md) ·
-[Beta installation and platform evidence](guides/beta-installation.md) ·
-[Beta release notes](guides/release-notes-v0.2.0-beta.1.md) ·
-[Detailed CLI/diagnostic guide (preserved DX1 documentation)](guides/usage.md) ·
-[Canonical skill](skills/vision-ui-doctor/SKILL.md) · [License](LICENSE)
+| Your coding agent | Run this command (PowerShell) |
+| --- | --- |
+| **Codex** | `node $installer install --agent codex --scope project` |
+| **Claude Code** | `node $installer install --agent claude-code --scope project` |
+| **Gemini CLI** | `node $installer install --agent gemini-cli --scope project` |
+| **Antigravity** | `node $installer install --agent antigravity --scope project` |
+| **Cursor** | `node $installer install --agent cursor --scope project` |
 
-## Quick developer workflow
+**Important:** If you opened a new PowerShell window, redefine `$installer` using the command in Step 1. Run installation from your website project folder, or pass `--project-root 'D:\path\to\your-app'`. Installing the skill is separate from installing Node.js, Chrome and the scanner.
 
-1. Start your local public website (for example `http://localhost:5173`).
-2. Run `node $vud scan --url http://localhost:5173 --out reports/scan` from the application's directory.
-3. Read `reports/scan/REPORT.md`, or let an installed agent start with `scan-status.json` and `AGENT_HANDOFF.md`.
-4. Review measured issues and incomplete states. Approve only the specific fixes you want.
-5. Run a **fresh** verify/scan after changes; skipped states are never treated as resolved.
+Then open a **new agent chat** if necessary and say:
 
-> **Feedback welcome:** [Report a bug](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=bug_report.md), [request a feature](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=feature_request.md), or [join the public-beta feedback thread](https://github.com/visionnumbers/vision-ui-doctor/issues/8). Never upload credentials, cookies, private browser profiles or unredacted private reports.
+> Use Vision UI Doctor to scan my local website, explain the most important UI issues, and suggest small fixes. Ask for my approval before changing files. Verify any approved changes.
 
-## Known issues
+Agent availability and skill discovery vary by host. Installation support does not guarantee every agent version has been tested.
 
-- Browser navigation/CDP and Windows lifecycle/stream-cleanup timeouts can fail
-  runs. Cleanup failures remain fatal; no retry-until-green promise.
-- SPA scans can be incomplete. Skipped/failed states and undiscovered routes are
-  unknown, not clean; historical runs measured 33/36 configured states.
-- npm-generated Windows .cmd shims can fail in paths containing `&`; .ps1 shims
-  may be blocked by execution policy. Use the quoted Direct-Node commands above.
-- Current Linux/macOS packaging and live compatibility with every agent host are
-  unverified. Antigravity success is user-reported, not universal certification.
+[Detailed agent installation guide](guides/agent-installation.md)
 
-No authentication/gateway support in the skill. Probable/needs-review findings
-require corroboration. This beta is not complete UX/WCAG or security acceptance.
-See the installation guide for precise evidence and safe update boundaries.
+## ✅ What can it check?
+
+- Responsive overflow, clipping, alignment and selected UI geometry
+- Configured SPA interactions and screen-size-specific states
+- Selected usability and contextual experience patterns (some are probable or review-needed)
+- Screenshots/evidence when requested, coverage gaps, and compact AI-agent reports
+
+**Not included:** Automatic full-site exploration, logged-in/authenticated auditing, complete visual-design judgment, or guaranteed WCAG compliance. To scan additional pages or interactions, configure routes/SPA scenarios explicitly.
+
+## 🖼️ Visual overview
+
+A designed overview and quick-start illustration are available as optional repository assets. These are **illustrations, not screenshots of a working GUI or real scan results**. The current product is primarily a CLI.
+
+## 🛠️ Need more options?
+
+For custom routes, configured SPA states, source handoff and fresh verification, use:
+
+- [Full usage guide](guides/usage.md)
+- [Beta installation / troubleshooting](guides/beta-installation.md)
+- [Release notes](guides/release-notes-v0.2.0-beta.1.md)
+- [Canonical Agent Skill](skills/vision-ui-doctor/SKILL.md)
+
+### Windows command note
+
+The direct `node $vud` method above is intentional: npm-generated Windows launchers can fail in paths containing `&`, and PowerShell may restrict `.ps1` scripts. No policy bypass is necessary.
+
+## 💬 Help improve Vision UI Doctor
+
+Found a real bug, false positive, or missing feature?
+
+**[Report a bug](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=bug_report.md)** · **[Request a feature](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=feature_request.md)** · **[Join the public-beta feedback thread](https://github.com/visionnumbers/vision-ui-doctor/issues/8)**
+
+Please remove tokens, cookies, private page content and other sensitive information from shared logs and screenshots.
+
+## Known beta limitations
+
+- Occasional browser navigation/CDP or process-cleanup failures; scan coverage may be incomplete.
+- Unconfigured SPA states and undiscovered routes are not examined.
+- Windows npm command shims may fail with special-character paths; use the documented Direct-Node method.
+- Linux/macOS and some agent-host combinations are not yet verified.
+- Scanner candidates need human review; the tool does not make changes without user approval.
+
+[MIT License](LICENSE)
