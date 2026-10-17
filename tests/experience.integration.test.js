@@ -9,7 +9,9 @@ import {buildExperienceSnapshotScript,detectExperience} from '../src/detectors/e
 import {experienceCases,experienceFixture} from './fixtures/experience-cases.js';
 
 test('real experience: five broken/corrected/legitimate triples with bounded DOM evidence',async t=>{
- const server=createServer((req,res)=>{const [,pattern,variant]=req.url.split('/');res.setHeader('content-type','text/html');res.end(experienceFixture(pattern,variant));});
+ // Model a normal UA button line-height even on platforms inheriting body metrics.
+ // Specific fixture typography must override it, rather than depend on host fonts.
+ const server=createServer((req,res)=>{const [,pattern,variant]=req.url.split('/');res.setHeader('content-type','text/html');res.end(experienceFixture(pattern,variant).replace('<style>','<style>button{line-height:normal}'));});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
  const before=new Set((await readdir(tmpdir())).filter(n=>n.startsWith('vision-ui-doctor-'))),out=resolve('reports',`experience-fixture-${Date.now()}-${process.pid}`);await mkdir(out);
  const browser=await browserSession({chromium:process.env.CHROMIUM_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe',timeout:10000,operationTimeout:3000,shutdownTimeout:5000});

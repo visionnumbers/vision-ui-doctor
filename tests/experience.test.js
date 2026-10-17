@@ -2,6 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {detectExperience} from '../src/detectors/experience.js';
 import {validateSpaConfig,spaPacket,compareSpaRuns} from '../src/spa-workflow.js';
+import {experienceFixture} from './fixtures/experience-cases.js';
+
+test('wrapping fixtures explicitly keep buttons within compact-control line-height bounds',()=>{
+ for(const variant of ['broken','corrected','legitimate']){
+  const html=experienceFixture('wrap',variant),rule=/#subject button\s*\{([^}]+)\}/.exec(html)?.[1];
+  assert.ok(rule,variant);
+  const metric=property=>Number.parseFloat(new RegExp('(?:^|;)\\s*'+property+'\\s*:\\s*([\\d.]+)px').exec(rule)?.[1]);
+  const height=metric('height'),lineHeight=metric('line-height');
+  assert.ok(Number.isFinite(lineHeight),'explicit line-height must not depend on user-agent defaults: '+variant);
+  assert.ok(height<=lineHeight*2.5,'fixture must satisfy the existing compact-control eligibility bound: '+variant);
+ }
+});
 
 const snapshot=()=>({viewport:{width:320,height:700},fragmentation:[],content:[],toolbars:[],collisions:[],headers:[],checked:40,truncated:false});
 const seeds={
