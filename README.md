@@ -1,20 +1,26 @@
 # Vision UI Doctor
 
+## Public beta: 0.2.0-beta.1
+
 Local public website UI/UX audits and an Agent Skills installer for Codex, Claude
 Code, Gemini CLI, Antigravity IDE and Cursor. Experimental; browser cleanup and
-incomplete coverage remain known limitations.
+incomplete coverage remain known limitations. Feedback and minimal reproductions
+are welcome through GitHub bug reports and feature requests. Not a stable release.
 
 ## Quick start
 
-For a locally supplied beta tarball, use the [beta installation and limitations
-guide](guides/beta-installation.md). Windows users should use the quoted direct
-Node commands below; generated npm wrappers have environment-specific limitations.
-
-Keep a maintained checkout with Node.js 22+ and Chrome/Chromium. Start your app,
-then invoke the public CLI from your application directory:
+Use Node.js 22+ and an independently installed Chrome/Chromium. After this beta
+has been published, install it without a global npm installation (Windows
+PowerShell; use a fresh durable prefix):
 
 ```powershell
-$vud = 'D:\Tools\vision-ui-doctor\src\public-cli.js'
+$prefix = 'D:\Tools\vision-ui-doctor-beta'
+npm.cmd install --prefix $prefix --global=false --ignore-scripts --no-audit --no-fund --no-package-lock --save=false vision-ui-doctor@0.2.0-beta.1
+$runtime = Join-Path $prefix 'node_modules/vision-ui-doctor'
+$vud = Join-Path $runtime 'src/public-cli.js'
+$installer = Join-Path $runtime 'src/cli.js'
+node $vud --version
+# Start your public app's dev server, then run from its directory:
 node $vud scan --url http://localhost:5173 --out reports/scan
 ```
 
@@ -24,16 +30,18 @@ SPA states need explicit scope; a clean result does not certify the whole site.
 
 ## Install the agent skill
 
-From your application directory, run the source executable (interactive):
+From your application directory, using the installed runtime above (interactive):
 
 ```powershell
-$installer = 'D:\Tools\vision-ui-doctor\src\cli.js'
 node $installer install
 ```
 
 If this local package is already installed/linked on PATH, use
-`vision-ui-doctor install`. No registry download or global install is required or
-performed. The skill binds this existing scanner; it does not install Node/Chrome.
+`vision-ui-doctor install`. The skill installer itself performs no registry
+download or global install. It binds this existing scanner, not Node/Chrome.
+Windows Direct-Node invocation is the verified workaround for generated wrapper
+limitations. Do not bypass PowerShell execution policy. Source checkout users can
+instead define $vud and $installer as absolute src/public-cli.js and src/cli.js paths.
 
 | Agent | Explicit install example (after defining $installer) | Confirm discovery |
 | --- | --- | --- |
@@ -55,9 +63,22 @@ edits require explicit authorization and fresh verification; nothing is committe
 uploaded or deployed automatically.
 
 [Installer destinations, official sources and safety](guides/agent-installation.md) ·
+[Beta installation and platform evidence](guides/beta-installation.md) ·
+[Beta release notes](guides/release-notes-v0.2.0-beta.1.md) ·
 [Detailed CLI/diagnostic guide (preserved DX1 documentation)](guides/usage.md) ·
 [Canonical skill](skills/vision-ui-doctor/SKILL.md) · [License](LICENSE)
 
-No authentication/gateway support in the skill. No npm publication or stable-
-release acceptance is implied. Filesystem installer tests do not prove live
-compatibility with every agent runtime.
+## Known issues
+
+- Browser navigation/CDP and Windows lifecycle/stream-cleanup timeouts can fail
+  runs. Cleanup failures remain fatal; no retry-until-green promise.
+- SPA scans can be incomplete. Skipped/failed states and undiscovered routes are
+  unknown, not clean; historical runs measured 33/36 configured states.
+- npm-generated Windows .cmd shims can fail in paths containing `&`; .ps1 shims
+  may be blocked by execution policy. Use the quoted Direct-Node commands above.
+- Current Linux/macOS packaging and live compatibility with every agent host are
+  unverified. Antigravity success is user-reported, not universal certification.
+
+No authentication/gateway support in the skill. Probable/needs-review findings
+require corroboration. This beta is not complete UX/WCAG or security acceptance.
+See the installation guide for precise evidence and safe update boundaries.

@@ -1,10 +1,25 @@
-# Limited beta: local tarball installation
+# Public beta 0.2.0-beta.1: installation and limitations
 
 This is an experimental, opt-in public-site workflow, not stable-release or
-security acceptance. No registry publication or automatic target-source edits.
-The current artifact retains version 0.2.0; identify a candidate by its supplied
-SHA-256/checkpoint, not the version alone. A distinct beta version and distribution
-approval are still required before registry release.
+security acceptance. Release preparation is not publication; registry commands
+below work only after publication is approved and completed. No automatic
+target-source edits. The prerelease version is 0.2.0-beta.1 and npm dist-tag is
+`beta`, not `latest`. Prefer an exact version for reproducible installation.
+
+## Install from npm after publication
+
+```powershell
+$prefix = 'D:\Tools\vision-ui-doctor-beta'
+npm.cmd install --prefix $prefix --global=false --ignore-scripts --no-audit --no-fund --no-package-lock --save=false vision-ui-doctor@0.2.0-beta.1
+$runtime = Join-Path $prefix 'node_modules/vision-ui-doctor'
+$vud = Join-Path $runtime 'src/public-cli.js'
+$installer = Join-Path $runtime 'src/cli.js'
+node $vud --version
+```
+
+To opt into the moving beta channel later, use `vision-ui-doctor@beta` instead of
+the exact version in a fresh prefix. Do not assume upgrading the npm runtime also
+updates installed skill instructions; use the ownership-safe procedure below.
 
 ## Install a supplied artifact without global changes
 
@@ -14,7 +29,7 @@ Use a fresh prefix. PowerShell example (replace the tarball path):
 
 ```powershell
 $prefix = 'D:\Tools\vision-ui-doctor-beta'
-$tarball = 'D:\Downloads\vision-ui-doctor-0.2.0.tgz'
+$tarball = 'D:\Downloads\vision-ui-doctor-0.2.0-beta.1.tgz'
 npm.cmd install --prefix $prefix --global=false --ignore-scripts --offline --no-audit --no-fund --no-package-lock --save=false $tarball
 $runtime = Join-Path $prefix 'node_modules/vision-ui-doctor'
 $vud = Join-Path $runtime 'src/public-cli.js'
@@ -62,7 +77,9 @@ ownership manifests, profiles or reports from your local installation.
   to resolve the runtime before reaching the CLI. The generated `.ps1` shim was
   blocked by the machine's script execution policy. Quoted `node $vud` and
   `node $installer` commands worked. No shim patch, policy change or bypass was
-  applied. Wrapper portability is not accepted; use direct Node for this beta.
+  applied. A one-line diagnostic copy proved npm's unquoted `SET dp0=%~dp0`
+  splits at the ampersand; no generated production shim was changed. Wrapper
+  portability is not accepted; use direct Node for this beta.
 
 ## Verified versus unverified
 
@@ -90,6 +107,7 @@ states cannot prove resolution. Report scoped outcomes and new sibling/responsiv
 findings. Cleanup failures remain fatal; preserve evidence and do not loop or
 increase deadlines just to get green. Keep reports local and Git-ignored.
 
-Recommendation: controlled beta with consenting developers using direct Node,
-known public targets and explicit fix approval. Not ready for unrestricted
-cross-platform executable distribution or a stable/registry release.
+Recommendation: public beta for consenting developers using direct Node,
+known public targets and explicit fix approval. Cross-platform executable support
+is unverified, not a prerequisite to this beta and not a stable-support claim.
+Report sanitized minimal reproductions through the repository's issue templates.

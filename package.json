@@ -1,6 +1,6 @@
 {
   "name": "vision-ui-doctor",
-  "version": "0.2.0",
+  "version": "0.2.0-beta.1",
   "description": "Local public UI/UX audits, evidence-based agent handoffs and an ownership-aware Agent Skills installer",
   "type": "module",
   "bin": {
@@ -16,6 +16,10 @@
     "node": ">=22"
   },
   "license": "MIT",
+  "repository": {"type": "git", "url": "git+https://github.com/visionnumbers/vision-ui-doctor.git"},
+  "bugs": {"url": "https://github.com/visionnumbers/vision-ui-doctor/issues"},
+  "homepage": "https://github.com/visionnumbers/vision-ui-doctor#readme",
+  "publishConfig": {"access": "public", "tag": "beta", "registry": "https://registry.npmjs.org/"},
   "keywords": [
     "responsive",
     "chromium",
