@@ -1,5 +1,166 @@
 # Vision UI Doctor
 
+## Diagnostic accuracy + usability batch
+
+The public SPA engine now has optional bounded text clipping/contrast, form-label/
+error, keyboard-semantic, hidden-tab-stop, crowded-target and fixed/sticky-control
+checks. Existing visibility/scroll analysis is axis-aware; animation observation
+precedes geometry detection. Intentional editor presentation retains original IDs
+as reviewable diagnostics rather than masquerading as a confirmed defect or pass.
+
+Set `ux.usability: true` in your reviewed public SPA config. Optional
+`ux.stabilizeMs` (250–15000 ms within the shared run deadline) observes legitimate
+transitions without changing application CSS. See [triggers, counterexamples,
+confidence definitions and explicit unsupported checks](examples/diagnostic-checks.md).
+
+```powershell
+node examples/serve-public-diagnostics.mjs
+# In another terminal from this checkout:
+node src/public-cli.js spa-audit --config examples/public-diagnostics.json --out reports/diagnostics-before
+node src/public-cli.js packet --report reports/diagnostics-before/public-run.json
+# After your authorized external fix:
+node src/public-cli.js spa-verify --report reports/diagnostics-before/public-run.json --issue ISSUE_ID --out reports/diagnostics-after
+```
+
+Packets stay bounded/provider-neutral, include both raw/grouped counts and
+confirmed/probable/needs-review/unsupported assessments, and retain existing
+source candidates, snippets, metadata caching and fresh browser verification.
+The core never patches an audited app. This is not full visual/UX understanding,
+secure isolation or comprehensive accessibility certification.
+
+## Advanced UI/UX evidence increment (experimental, local public apps)
+
+This increment adds **measured responsive container failures, configured sibling
+region overlap, explicit alignment expectations and shared-ancestor root-cause
+candidates** to the existing public SPA workflow. It does not measure overall
+design quality. A clean run means only that the configured checks found no issue.
+No Python Academy or other application source is required or modified.
+
+From this checkout, start the generic disposable fixture in one terminal:
+
+```powershell
+node examples/serve-public-ux.mjs
+```
+
+From another terminal in the same checkout (optional `--chromium "C:\Program Files\Google\Chrome\Application\chrome.exe"`):
+
+```powershell
+node src/public-cli.js spa-audit --config examples/public-ux.json --out reports/ux-before --screenshots
+node src/public-cli.js packet --report reports/ux-before/public-run.json
+node src/public-cli.js sources --report reports/ux-before/public-run.json --issue ISSUE_ID --project-root "C:\Projects\my-app"
+node src/public-cli.js snippet --report reports/ux-before/public-run.json --issue ISSUE_ID --project-root "C:\Projects\my-app" --file src/workspace.css
+# After an external, authorized CSS/JS patch:
+node src/public-cli.js spa-verify --report reports/ux-before/public-run.json --issue ISSUE_ID --out reports/ux-after --screenshots
+```
+
+Repeat `--issue` to verify several selected findings (maximum 10). Choose a fresh
+output directory each time. The CLI never patches source or calls an AI provider.
+If this checkout is inside `.temp`, source lookup remains excluded there: use
+your explicitly opted-in real project root or a disposable copy outside excluded
+directories. Browser scans are always fresh; only source-index hash metadata is
+cached. Existing source/snippet secret exclusions and byte limits still apply.
+
+Add this optional strict `ux` object to the public SPA schema (full example in
+`examples/public-ux.json`):
+
+```json
+"ux": {
+  "regions": [
+    {"selector":"#content","minWidthPx":240},
+    {"selector":"#card-a"},
+    {"selector":"#card-b"}
+  ],
+  "alignments": [
+    {"id":"toolbar-top","selectors":["#tool-a","#tool-b"],"axis":"top","tolerancePx":4}
+  ]
+}
+```
+
+At most 20 unique regions and 10 alignment expectations (2–8 peers each).
+Selectors use the existing single `#id`, `.class`, `[data-testid="name"]` grammar.
+Regions must match exactly one element. `minWidthPx` is an **explicit usability
+expectation**, 24–2000 CSS px, not a guessed ideal width. Alignment axes are
+`left`, `right`, `top`, `bottom`; tolerances are explicit 0–40 px. This also catches
+spacing mistakes that move declared peer edges; it is not automatic spacing-token
+or typography evaluation. Every configured expectation is applied at each viewport;
+split runs/configs when design intent differs at breakpoints.
+
+Configured visible sibling regions are checked for rectangle intersection and an
+actual center hit within the shared viewport area. Ancestor/descendant containment
+is not reported as sibling overlap. Declare an intentional overlay with a region's
+`"allowOverlapWith":["#other-region"]`; declarations must reference known regions.
+Overlap findings are **medium-confidence candidates**, not proof of bad intent:
+transparent regions, corner shapes or complex compositing still need visual review.
+The independent selected-control hit test continues to catch unreachable controls.
+Responsive failures use actual flex/grid parent widths; intentionally horizontally
+scrollable parents are not treated as broken flex/grid fit. Existing overflow and
+clipping detectors are reused, not replaced by another browser or crawler.
+
+Shared paint-visibility checks exclude zero-sized/display:none/inherited-hidden
+elements and descendants of zero-opacity/content-visibility:hidden ancestors.
+`aria-hidden` alone is not visual hiding. Inert/pointer-events:none controls are
+distinguished from paint visibility and remain inaccessible rather than silently
+passed. UX geometry is sampled at 60 ms intervals, at most four samples: observed
+movement yields an incomplete unstable state, not a confident layout verdict.
+This short stability window is not a guarantee that later asynchronous UI changes
+or animations cannot occur. Missing/ambiguous UX selectors are partial coverage
+and cannot establish selected-issue resolution; intentional hidden checks are
+recorded separately. Such partial checks do not stop later declared interactions.
+
+### Reports, groups and local visual evidence
+
+`public-run.json` retains all original issue IDs, per-state geometry, computed
+layout context, partial/failed states and full `rootCauseCandidates` membership.
+Candidates group by measured clipping/flex/grid ancestor or explicit layout
+region; they rank by severity then affected issue count. They are medium-confidence
+**candidate-not-proven** explanations, not invented causal certainty. Inspect
+the owning CSS before fixing the parent. All child IDs/evidence remain available.
+
+The compact packet defaults to 10 issues / 16 KiB, prioritizing different defect
+categories/root regions before repeated occurrences. It includes up to five root
+candidates, representative IDs, affected states/viewports, concise numeric evidence,
+uncertainty and targeted fix guidance. Omitted issue and affected-state counts are
+explicit; full membership remains in the local run. Estimated tokens are only a
+bytes/4 heuristic. No raw DOM, page text, full CSS, logs or screenshots are embedded.
+
+`--screenshots` opts into viewport PNGs **locally**, default off and independently
+renewed for verification. Files use state identity hashes, with selected-element
+viewport rectangles attached to findings where measured (otherwise rect:null).
+Each image is capped at 8 MiB, all images at 32 MiB/run. Capture/write failure is
+incomplete coverage, never silent success. Fresh comparison links selected before/
+after viewport images in their respective run directories. There is **no pixel
+diff, automatic crop, AI visual understanding or automatic image transfer**.
+
+### Demonstrated scope versus deferred capabilities
+
+The disposable demo has independent mobile flex sizing, overlapping cards,
+toolbar misalignment and a close-panel handler bug. It includes opacity-hidden,
+visibility-hidden, display-hidden and intentionally scrollable controls. The
+test externally patches a temporary copy's CSS/JS and freshly replays every state;
+repository fixture bugs remain intentional. No automatic source modification.
+The screenshot-enabled example explicitly uses a 5000 ms state budget: a local
+3000 ms run exhausted its budget during UX measurement and remained incomplete.
+This does not change engine defaults/limits or the browser cleanup deadline;
+slow targets can still produce truthful incomplete coverage.
+
+Implemented: configured public sidebar/navigation/tabs, responsive geometry and
+explicit min-width/alignment rules, sibling overlap candidates, visibility-chain
+accuracy, bounded stability checks, ancestor grouping, local screenshots and
+provider-neutral source/verification handoff. Generic modal toggles can use the
+same explicit click/visible/hidden schema; modal focus/accessibility is not proven.
+
+Deferred: keyboard traversal/focus visibility/trapping, automatic repeated-component
+spacing/typography hierarchy, composited color contrast, comprehensive touch-target
+auditing of SPA states, unexpected shift interpretation, vertical scroll-trap
+analysis, breakpoint inference, broad header/overlay semantics, visual balance,
+pixel diffs and AI visual review. These require separate validated increments,
+not dozens of unverified rules. No claim of complete WCAG or application usability.
+
+Normal Chrome sandbox, public consent, same-origin/base-path checks, authAllowed:false,
+no secure-isolation claim, blocked M2.2 authentication and fatal cleanup behavior
+are unchanged. The intermittent Windows cleanup beta limitation remains; static
+or mock success is not lifecycle/security acceptance. No publication is implied.
+
 ## Local public audit -> targeted agent context -> fresh verify
 
 **Experimental private beta — public pages only, not stable-release acceptance.** Windows Chrome cleanup can intermittently fail while waiting for process-stream shutdown. Cleanup errors remain failures (exit `1`); an owned temporary profile may be retained when shutdown cannot be verified. The cause is unresolved: do not assume a clean scan means cleanup is universally reliable. No authentication, gateway or secure-isolation acceptance is included.
@@ -249,6 +410,111 @@ keep the sandbox enabled. Startup failures report exit/signal and bounded,
 sanitized diagnostic categories; raw Chrome stderr is never printed.
 
 MIT license. This is a diagnostic development tool, not a penetration-testing suite or source-code repair guarantee.
+
+## Explicit public SPA interactions (experimental)
+
+Use this additive workflow for **your own or explicitly authorized public dev app**.
+It reuses Chromium/CDP and the existing layout detectors; no second crawler, AI
+provider, automatic patches or authentication are involved. Existing commands and
+report schema 3 remain unchanged. SPA runs have their own `kind: "public-spa"`
+schema 1 envelope, not a fabricated static-page success report.
+
+Start the disposable generic HTML/JS fixture in one terminal:
+
+```powershell
+node examples/serve-public-spa.mjs
+```
+
+In another terminal, run from the repository root (optional `--chromium PATH`,
+including a quoted Windows path). Choose a **new** report directory each run:
+
+```powershell
+node src/public-cli.js spa-audit --config examples/public-spa.json --out reports/spa-before
+node src/public-cli.js packet --report reports/spa-before/public-run.json
+node src/public-cli.js sources --report reports/spa-before/public-run.json --issue ISSUE_ID --project-root "C:\Projects\my-app"
+node src/public-cli.js snippet --report reports/spa-before/public-run.json --issue ISSUE_ID --project-root "C:\Projects\my-app" --file src/sidebar.css
+# Apply your own authorized patch, then replay the actual browser states:
+node src/public-cli.js spa-verify --report reports/spa-before/public-run.json --issue ISSUE_ID --out reports/spa-after
+```
+
+The fixture intentionally covers the mobile Close button and makes the Dashboard
+panel too wide. Its `sidebar` scenario opens/closes; `navigation` moves between
+`#/home` and `#/dashboard`; `tabs` selects Details and Summary. To try a manual fix,
+remove the mobile `#broken-cover` display rule and change the mobile `#wide-panel`
+width to `100%`, then run `spa-verify`. The automated demo patches a disposable
+copy only, not repository fixtures. For source lookup, choose your real project
+root: hard-excluded directories such as `.temp` remain excluded even when they
+contain a worktree. Source candidates are lexical hints, not proven ownership.
+
+Minimal configuration (separate from M2.1's **planned-only** journey schema):
+
+```json
+{
+  "schemaVersion": 1,
+  "url": "http://127.0.0.1:4173/",
+  "viewports": ["small", "desktop"],
+  "timeoutMs": 3000,
+  "scenarios": [{
+    "id": "sidebar",
+    "route": "/#/home",
+    "steps": [
+      {"id":"open","click":"#open-menu","purpose":"toggle","visible":["#sidebar"]},
+      {"id":"close","click":"#close-menu","purpose":"toggle","hidden":["#sidebar"]}
+    ]
+  }]
+}
+```
+
+Only the shown fields are accepted. A step's `purpose` is `toggle`, `navigation`
+or `tab`; optional `url` asserts an exact canonical same-origin/base-path URL.
+Every click requires a visible/hidden/URL expectation. Selectors are single IDs,
+classes or `[data-testid="name"]`, with exactly one match for a clicked control.
+No arbitrary JS, scripts, forms, input fields, credential config, protected routes,
+remote configs or generic M2 journeys. Explicit anchors require a matching `url`
+declaration. Configuration never grants remote consent: renew `--allow-remote`
+on both audit and verification when applicable.
+
+Bounds: 10 scenarios, 12 clicks/scenario, 100 total viewport states including
+each initial state, 40 observed selectors/scenario, 8 selectors/expectation list,
+250–5000 ms/state and a 60-second run deadline (existing cleanup has its own
+budget). Controls must be visible, enabled, fully on-screen and center-hit-test
+reachable. Form/download/destructive-looking controls are rejected, not clicked.
+These checks are guardrails, **not proof that a custom handler is harmless**:
+review your selected app controls. Code can make requests before a post-click
+URL check; this is `LOCAL_TRUSTED`, `authAllowed:false`, `networkIsolation: NONE`,
+not secure confinement or a way to enable blocked M2.2 authentication.
+
+`public-run.json` contains bounded selector existence/visibility/rectangles before
+and after each click, actual canonical URLs/hashes, post-state layout findings,
+and explicit failed/skipped states. No DOM text, HTML or console logs are captured.
+A failed interaction stops its scenario; independent scenarios/viewports continue.
+Ambiguous assertion selectors fail rather than inspecting only the first match.
+The reused layout detector visits at most 4000 elements and returns at most 35
+layout findings per state; exceeding the DOM visit budget marks that state
+incomplete. It is not an exhaustive detector even below those limits.
+Failed loading/CDP/assertions cannot become clean coverage. Layout findings alone
+do not mean execution failed. Cleanup errors remain fatal, never ignored.
+
+`agent-packet.json` defaults to 10 issues / 16 KiB, preserving coverage, issue IDs,
+state/viewport attribution, confidence and numeric evidence. Duplicate geometry
+on the same actual route/element is grouped across states/viewports without
+discarding individual IDs. `omitted` is explicit; select IDs with `packet --issue`
+to retrieve them. Token counts are estimates, not free context or AI calls.
+The existing opt-in source lookup, content-hash metadata cache and snippet limits
+(3 files, 40 lines/file, 8 KiB) also work for SPA issues. Browser results are never
+cached. Do not place secrets in URLs, identifiers, selectors or public application
+source; arbitrary secret detection is not guaranteed.
+
+Fresh verification replays **all configured scenarios/viewports** from their start
+URLs. Selected results are `persistent`, `resolved-for-this-check` (successful
+state plus same-state element witness), or `unknown`; missing/failed states or
+removed selectors are never claimed resolved. New issue IDs identify regressions
+elsewhere in that configured scope. This is not an exhaustive SPA/WCAG audit:
+no arbitrary exploration, login, shadow-root/iframe controls, keyboard/touch
+gestures, animation-stability guarantee or design-intent inference. Normal Chrome
+sandbox and the known intermittent Windows stream-cleanup beta limitation remain.
+Exit codes: 0 clean command/check; 2 findings/incomplete/unresolved; 64 invalid
+input; 1 runtime or cleanup failure. No Linux CI claim for unpushed changes.
 
 Browser shutdown closes page sockets, then waits for process and inherited-stream
 closure before deleting its isolated temporary profile. On Windows it terminates

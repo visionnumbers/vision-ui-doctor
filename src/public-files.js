@@ -44,3 +44,10 @@ export async function writeJson(path,value){
  const handle=await open(absolute,constants.O_WRONLY|constants.O_CREAT|constants.O_TRUNC|(constants.O_NOFOLLOW??0),0o600);
  try{await handle.writeFile(JSON.stringify(value));}finally{await handle.close();}
 }
+
+export async function writeLocalImage(path,data){
+ if(!Buffer.isBuffer(data)||data.length>8*1024*1024||!data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw usage('Screenshot must be a bounded PNG');
+ const absolute=await checkedPath(path,{create:true});
+ const handle=await open(absolute,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|(constants.O_NOFOLLOW??0),0o600);
+ try{await handle.writeFile(data);}finally{await handle.close();}
+}

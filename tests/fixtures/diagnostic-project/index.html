@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Generic diagnostic accuracy</title><link rel="stylesheet" href="/style.css">
+<button id="open-panel" type="button">Open panel</button><aside id="panel" hidden><button id="close-panel" type="button">Close panel</button><p>Animated public panel</p></aside>
+<h1>Measured usability cases</h1>
+<p id="low-contrast">Low contrast body text.</p>
+<div id="clipped-text">Important content clipped without an expansion mechanism.</div>
+<div id="ellipsis">Intentional compact summary with an ellipsis.</div>
+<div id="complex-paint">Complex background requires review.</div>
+<div id="editor-frame"><pre id="editor"><code id="editor-code">A long deliberately scrollable editor line: abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz</code></pre></div>
+<div id="mirror-box"><div id="number-gutter"><span>1</span><span>2</span><span>3</span><span>4</span><span id="last-line-number">5</span></div><pre id="mirror-layer"><code id="mirror-token">A generic intentionally clipped editor presentation layer with a paired textarea.</code></pre><textarea id="mirror-input" aria-label="Synthetic editor" spellcheck="false">Synthetic editor content.</textarea></div>
+<div id="collapsed" aria-hidden="true"><button id="collapsed-label" type="button" tabindex="-1">Intentional collapsed label</button><button id="hidden-tab" type="button">Hidden but still in tab order</button></div>
+<div id="inherited-hidden"><span id="hidden-child">Hidden descendant</span><span id="visible-override">Explicitly visible override with low contrast.</span></div>
+<div><input id="missing-label" placeholder="Placeholder is not a label"><label for="good-input">Good input</label><input id="good-input"><input id="title-input" title="Native title fallback"></div>
+<div><input id="invalid-field" aria-label="Example field" aria-invalid="true" aria-describedby="missing-error"><span id="feedback">Invalid example feedback</span><input id="disabled-input" disabled></div>
+<div id="keyboard-role" role="button">Button-like control without keyboard focus</div>
+<div><button class="crowded" id="small-a" type="button">1</button><button class="crowded" id="small-b" type="button">2</button><button id="isolated-small" type="button">3</button></div>
+<div id="outer-scroll"><div id="clip-holder"><button id="true-clip" type="button">Clipped control</button></div><div id="scroll-range"></div></div>
+<button id="covered-control" type="button">Covered control</button><div id="fixed-shade" aria-hidden="true"></div>
+<script src="/app.js"></script></html>

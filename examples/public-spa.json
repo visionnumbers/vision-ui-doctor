@@ -1,0 +1,21 @@
+{
+ "schemaVersion": 1,
+ "url": "http://127.0.0.1:4173/",
+ "viewports": ["small", "desktop"],
+ "timeoutMs": 3000,
+ "scenarios": [
+  {"id":"sidebar","route":"/#/home","steps":[
+   {"id":"open","click":"#open-menu","purpose":"toggle","visible":["#sidebar"]},
+   {"id":"close","click":"#close-menu","purpose":"toggle","hidden":["#sidebar"]}
+  ]},
+  {"id":"navigation","route":"/#/home","steps":[
+   {"id":"open","click":"#open-menu","purpose":"toggle","visible":["#sidebar"]},
+   {"id":"dashboard","click":"#dashboard-link","purpose":"navigation","url":"/#/dashboard","visible":["#dashboard"],"hidden":["#home"]},
+   {"id":"home","click":"#home-link","purpose":"navigation","url":"/#/home","visible":["#home"],"hidden":["#dashboard"]}
+  ]},
+  {"id":"tabs","route":"/#/dashboard","steps":[
+   {"id":"details","click":"#details-tab","purpose":"tab","visible":["#details-panel"],"hidden":["#summary-panel"]},
+   {"id":"summary","click":"#summary-tab","purpose":"tab","visible":["#summary-panel"],"hidden":["#details-panel"]}
+  ]}
+ ]
+}

@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {isPaintedElement,measureOverflowChain} from './visibility.js';
 
 export const LAYOUT_CATEGORY=Object.freeze({
  DOCUMENT_OVERFLOW:'DOCUMENT_OVERFLOW',
@@ -31,13 +32,14 @@ export function classifyDocumentLayout({viewportWidth,documentWidth,tolerance=2}
 export function classifyElementLayout(snapshot={}){
  if(snapshot.inactive||snapshot.decorative)return [];
  const evidence={rect:roundRect(snapshot.rect),viewport:snapshot.viewport,overflowPx:snapshot.overflowPx,position:snapshot.position,transform:snapshot.transform,direction:snapshot.direction};
- if(snapshot.scrollAncestor){
+ if(snapshot.scrollAncestor&&!snapshot.clipAncestor&&snapshot.scrollAncestor.protectsOverflow!==false){
   evidence.scrollingAncestor=snapshot.scrollAncestor;
   return [finding({category:LAYOUT_CATEGORY.INTENTIONAL_SCROLL_REGION,severity:'info',confidence:'high',selector:snapshot.scrollAncestor.selector||snapshot.selector,detail:`${snapshot.scrollAncestor.axis||'content'} scrolling: client=${snapshot.scrollAncestor.clientWidth??snapshot.scrollAncestor.clientHeight} scroll=${snapshot.scrollAncestor.scrollWidth??snapshot.scrollAncestor.scrollHeight}`,evidence,explanation:'Overflow is contained by an explicitly scrollable region and remains reachable.',suggestion:'No responsive fix is required unless scrolling is unintended or controls are inaccessible.',diagnostic:true})];
  }
  if(snapshot.clipAncestor){
   evidence.clippingAncestor=snapshot.clipAncestor;
   const interactive=!!snapshot.interactive;
+  if(!interactive&&snapshot.clipAncestor.presentation)return [{...finding({category:LAYOUT_CATEGORY.CONTENT_CLIPPED,severity:'info',confidence:'medium',selector:snapshot.selector,detail:'Clipping in a structurally paired textarea presentation layer',evidence,explanation:'Geometry matches an auxiliary highlight mirror or line-number gutter beside a textarea; synchronization was not tested.',suggestion:'Review editor synchronization separately; preserve this observation rather than treating presentation clipping as a confirmed defect.',diagnostic:true}),assessment:'probable',classification:'intentional-candidate',originalCategory:LAYOUT_CATEGORY.CONTENT_CLIPPED}];
   return [finding({category:interactive?LAYOUT_CATEGORY.INTERACTIVE_ELEMENT_CLIPPED:LAYOUT_CATEGORY.CONTENT_CLIPPED,severity:interactive?'high':'medium',confidence:interactive?'high':'medium',selector:snapshot.selector,detail:`Content extends beyond ${snapshot.clipAncestor.selector||'a clipping ancestor'}`,evidence,explanation:interactive?'An interactive control is partially hidden by a clipping ancestor and may be unreachable.':'Visible content extends beyond an ancestor that clips overflow; intent cannot be proven from geometry alone.',suggestion:interactive?'Resize or reposition the control, or make the containing region intentionally scrollable.':'Confirm whether the clipping is decorative; otherwise adjust sizing, wrapping, or overflow behavior.'})];
  }
  const overflow=snapshot.overflowPx||{};
@@ -71,18 +73,16 @@ function collectLayoutSnapshot(){
  const rectValue=rect=>({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height});
  const selector=element=>{if(element.id)return '#'+CSS.escape(element.id);const parts=[];let current=element;while(current&&current.nodeType===1&&parts.length<5){let part=current.tagName.toLowerCase();if(current.classList.length)part+='.'+Array.from(current.classList).slice(0,2).map(value=>CSS.escape(value)).join('.');parts.unshift(part);current=current.parentElement;}return parts.join(' > ');};
  const isScrollable=(style,element)=>{const horizontal=/^(auto|scroll)$/.test(style.overflowX)&&element.scrollWidth>element.clientWidth+tolerance;const vertical=/^(auto|scroll)$/.test(style.overflowY)&&element.scrollHeight>element.clientHeight+tolerance;return horizontal||vertical?{selector:selector(element),axis:horizontal&&vertical?'horizontal and vertical':horizontal?'horizontal':'vertical',overflowX:style.overflowX,overflowY:style.overflowY,clientWidth:element.clientWidth,scrollWidth:element.scrollWidth,clientHeight:element.clientHeight,scrollHeight:element.scrollHeight}:null;};
- const clippingAncestor=(element,rect)=>{for(let parent=element.parentElement;parent&&parent!==document.documentElement;parent=parent.parentElement){const style=getComputedStyle(parent),parentRect=parent.getBoundingClientRect();const clipX=/^(hidden|clip)$/.test(style.overflowX)&&(rect.left<parentRect.left-tolerance||rect.right>parentRect.right+tolerance);const clipY=/^(hidden|clip)$/.test(style.overflowY)&&(rect.top<parentRect.top-tolerance||rect.bottom>parentRect.bottom+tolerance);if(clipX||clipY)return {selector:selector(parent),overflowX:style.overflowX,overflowY:style.overflowY,rect:rectValue(parentRect)};}return null;};
- const scrollingAncestor=element=>{for(let current=element;current&&current!==document.documentElement;current=current.parentElement){const scroll=isScrollable(getComputedStyle(current),current);if(scroll)return scroll;}return null;};
  const elements=[];let checked=0;
  for(const element of document.body.querySelectorAll('*')){
   if(checked++>=4000)break;
   const style=getComputedStyle(element),rect=element.getBoundingClientRect();
-  if(style.display==='none'||style.visibility==='hidden'||Number(style.opacity)===0||rect.width<=0||rect.height<=0)continue;
-  const inactive=!!element.closest('[hidden],[inert],[aria-hidden="true"],details:not([open])');
+  if(!isPaintedElement(element))continue;
+  const inactive=false; // Visibility chains were measured; aria-hidden alone is not visual hiding.
   const interactive=element.matches('button,a[href],input:not([type="hidden"]),textarea,select,[role="button"],[role="link"],[role="dialog"],[aria-modal="true"]');
   const text=(element.textContent||'').trim().slice(0,2000),longest=text.split(/\s+/).reduce((length,value)=>Math.max(length,value.length),0);
   const parentStyle=element.parentElement?getComputedStyle(element.parentElement):null;
-  const scroll=scrollingAncestor(element),clip=clippingAncestor(element,rect);
+  const {scrollAncestor:scroll,clipAncestor:clip}=measureOverflowChain(element,rect,selector);
   const fixedToViewport=style.position==='fixed';
   const overflowPx={left:Math.max(0,-rect.left),right:Math.max(0,rect.right-viewportWidth),top:fixedToViewport?Math.max(0,-rect.top):0,bottom:fixedToViewport?Math.max(0,rect.bottom-viewportHeight):0};
   const boundary=Math.max(overflowPx.left,overflowPx.right,overflowPx.top,overflowPx.bottom)>tolerance;
@@ -94,4 +94,4 @@ function collectLayoutSnapshot(){
  return {document:{viewportWidth,documentWidth:document.documentElement.scrollWidth,tolerance},elements,checkedElements:checked};
 }
 
-export function buildLayoutSnapshotScript(){return `(${collectLayoutSnapshot.toString()})()`;}
+export function buildLayoutSnapshotScript(){return `(()=>{const isPaintedElement=${isPaintedElement.toString()};const measureOverflowChain=${measureOverflowChain.toString()};return (${collectLayoutSnapshot.toString()})()})()`;}

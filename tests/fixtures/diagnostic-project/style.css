@@ -1,0 +1,34 @@
+* { box-sizing: border-box; }
+body { margin: 12px; background: rgb(255,255,255); color: rgb(0,0,0); font: 16px system-ui; }
+button { min-height: 32px; padding: 6px; }
+input { min-height: 32px; max-width: 100%; }
+[hidden] { display: none !important; }
+#panel { padding: 8px; background: #eee; opacity: 0; transform: translateX(-300px); transition: transform 800ms ease, opacity 800ms ease; }
+#panel.open { opacity: 1; transform: translateX(0); }
+#low-contrast, #visible-override { color: #bbb; }
+#clipped-text, #ellipsis { width: 90px; height: 22px; overflow: hidden; white-space: nowrap; }
+#ellipsis { text-overflow: ellipsis; }
+#complex-paint { background-image: linear-gradient(white, black); }
+#editor-frame { max-width: 100%; width: 280px; overflow: hidden; }
+#editor { width: 100%; height: 70px; overflow: auto; white-space: pre; margin: 0; }
+#editor-code { display: block; width: max-content; }
+#mirror-box { position: relative; width: 280px; max-width: 100%; height: 70px; }
+#number-gutter { position: absolute; left: 0; top: 0; width: 40px; height: 70px; overflow: hidden; }
+#number-gutter span { display: block; height: 28px; }
+#mirror-layer, #mirror-input { position: absolute; top: 0; left: 40px; width: calc(100% - 40px); height: 70px; margin: 0; }
+#mirror-layer { pointer-events: none; overflow: hidden; }
+#mirror-token { display: block; width: 600px; height: 140px; }
+#mirror-input { background: transparent; color: transparent; caret-color: black; overflow: auto; }
+#collapsed { width: 0; height: 0; overflow: hidden; }
+#collapsed-label, #hidden-tab { width: 900px; }
+#inherited-hidden { visibility: hidden; }
+#visible-override { visibility: visible; }
+#keyboard-role { border: 1px solid black; padding: 8px; width: fit-content; }
+.crowded, #isolated-small { width: 16px; height: 16px; min-height: 0; padding: 0; font-size: 10px; }
+#isolated-small { margin-left: 80px; }
+#outer-scroll { width: 280px; max-width: 100%; overflow: auto; }
+#scroll-range { width: 500px; height: 1px; }
+#clip-holder { width: 70px; height: 30px; overflow: hidden; }
+#true-clip { width: 160px; height: 44px; }
+#covered-control { position: fixed; top: 90px; left: 12px; width: 170px; height: 44px; z-index: 5; }
+#fixed-shade { position: fixed; top: 90px; left: 12px; width: 180px; height: 44px; background: #ddd; z-index: 6; }

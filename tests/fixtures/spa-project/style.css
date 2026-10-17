@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+body { margin: 16px; font: 16px system-ui; }
+button, a { display: inline-block; padding: 12px; min-height: 44px; }
+[hidden] { display: none !important; }
+#sidebar { position: fixed; z-index: 10; inset: 70px auto auto 0; width: 280px; background: #eee; padding: 10px; }
+#sidebar a { display: block; }
+#close-menu { position: relative; }
+#broken-cover { display: none; }
+#wide-panel { width: 100%; padding: 12px; }
+@media (max-width: 500px) {
+ #broken-cover { display: block; position: absolute; inset: 10px 0 auto 10px; height: 44px; width: 160px; background: #ddd; }
+ #wide-panel { width: 900px; }
+}

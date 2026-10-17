@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Disposable UX cases</title><link rel="stylesheet" href="/style.css">
+<button id="open-panel" type="button">Open panel</button>
+<aside id="panel" hidden><button id="close-panel" type="button">Close panel</button><p>Explicit public panel</p></aside>
+<main>
+ <h1>Generic workspace</h1>
+ <div id="layout"><section id="content"><h2>Responsive content</h2><div id="child-a">Child A</div><div id="child-b">Child B</div><div id="child-c">Child C</div></section></div>
+ <div id="cards"><button id="card-a" type="button">First card</button><button id="card-b" type="button">Second card</button></div>
+ <div id="toolbar"><button id="tool-a" type="button">Previous</button><button id="tool-b" type="button">Next</button></div>
+ <div id="opacity-hidden"><button id="hidden-child" type="button">Intentionally invisible wide descendant</button></div>
+ <div id="visibility-hidden"><button id="visibility-child" type="button">Hidden inherited visibility</button></div>
+ <div id="display-hidden"><button id="display-child" type="button">Hidden display</button></div>
+ <div id="intentional-scroll"><div id="scroll-child">Intentionally scrollable content</div></div>
+</main><script src="/app.js"></script></html>

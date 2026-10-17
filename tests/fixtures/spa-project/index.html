@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Disposable public SPA</title>
+<link rel="stylesheet" href="/style.css">
+<button id="open-menu" type="button" aria-controls="sidebar">Open menu</button>
+<aside id="sidebar" hidden>
+ <button id="close-menu" type="button">Close menu</button>
+ <a id="dashboard-link" href="#/dashboard">Dashboard</a>
+ <a id="home-link" href="#/home">Home</a>
+ <div id="broken-cover" aria-hidden="true"></div>
+</aside>
+<main>
+ <section id="home"><h1>Home</h1></section>
+ <section id="dashboard" hidden><h1>Dashboard</h1>
+  <div role="tablist" aria-label="Dashboard views"><button id="summary-tab" type="button" role="tab" aria-selected="true">Summary</button><button id="details-tab" type="button" role="tab" aria-selected="false">Details</button></div>
+  <div id="summary-panel" role="tabpanel">Summary view</div><div id="details-panel" role="tabpanel" hidden>Details view</div>
+  <div id="wide-panel">A panel that becomes too wide only after dashboard navigation.</div>
+ </section>
+</main><script src="/app.js"></script></html>

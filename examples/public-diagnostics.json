@@ -1,0 +1,8 @@
+{
+ "schemaVersion":1,"url":"http://127.0.0.1:4173/","viewports":["small","desktop"],"timeoutMs":5000,
+ "scenarios":[{"id":"diagnostics","route":"/#/home","steps":[
+  {"id":"open","click":"#open-panel","purpose":"toggle","visible":["#panel"]},
+  {"id":"close","click":"#close-panel","purpose":"toggle","hidden":["#panel"]}
+ ]}],
+ "ux":{"regions":[{"selector":"#panel"},{"selector":"#editor"},{"selector":"#visible-override"}],"alignments":[],"usability":true,"stabilizeMs":4000}
+}

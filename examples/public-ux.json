@@ -1,0 +1,11 @@
+{
+ "schemaVersion":1,"url":"http://127.0.0.1:4173/","viewports":["small","desktop"],"timeoutMs":5000,
+ "scenarios":[{"id":"workspace","route":"/#/home","steps":[
+  {"id":"open","click":"#open-panel","purpose":"toggle","visible":["#panel"]},
+  {"id":"close","click":"#close-panel","purpose":"toggle","hidden":["#panel"]}
+ ]}],
+ "ux":{
+  "regions":[{"selector":"#content","minWidthPx":240},{"selector":"#card-a"},{"selector":"#card-b"},{"selector":"#hidden-child"},{"selector":"#visibility-child"},{"selector":"#display-child"}],
+  "alignments":[{"id":"toolbar-top","selectors":["#tool-a","#tool-b"],"axis":"top","tolerancePx":4}]
+ }
+}

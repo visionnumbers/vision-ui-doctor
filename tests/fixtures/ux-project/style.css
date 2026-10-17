@@ -1,0 +1,25 @@
+* { box-sizing: border-box; }
+body { margin: 12px; font: 16px system-ui; }
+button { min-height: 44px; padding: 10px; }
+[hidden] { display: none !important; }
+#panel { background: #eee; padding: 12px; }
+#layout { display: flex; width: 100%; }
+#content { width: 100%; min-width: 0; padding: 8px; background: #eee; }
+#child-a, #child-b, #child-c { width: 100%; padding: 8px; }
+#cards { position: relative; height: 70px; }
+#card-a { position: absolute; width: 130px; top: 8px; left: 0; }
+#card-b { position: absolute; width: 130px; top: 8px; left: 150px; }
+#toolbar { display: flex; align-items: flex-start; gap: 12px; }
+#tool-b { margin-top: 16px; }
+#opacity-hidden { opacity: 0; height: 0; overflow: hidden; }
+#hidden-child { width: 1800px; }
+#visibility-hidden { visibility: hidden; height: 0; overflow: hidden; }
+#visibility-child { width: 1800px; }
+#display-hidden { display: none; }
+#display-child { width: 1800px; }
+#intentional-scroll { overflow-x: auto; width: 100%; }
+#scroll-child { width: 700px; }
+@media (max-width: 500px) {
+ #content { min-width: 900px; }
+ #card-b { left: 70px; }
+}

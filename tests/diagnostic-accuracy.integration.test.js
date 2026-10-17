@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {mkdtemp,cp,readFile,writeFile,rm,readdir} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {runPublicCli} from '../src/public-cli.js';
+import {spaIssues} from '../src/spa-workflow.js';
+import {findingId} from '../src/detectors/layout.js';
+
+test('real accuracy: valid scroll/hidden/transition cases, broader defects and fresh external fix',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'vud-diagnostic-'));t.after(()=>rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100}));
+ await cp(fileURLToPath(new URL('./fixtures/diagnostic-project/',import.meta.url)),root,{recursive:true});
+ const server=createServer(async(req,res)=>{const file=({'/':'index.html','/style.css':'style.css','/app.js':'app.js'})[req.url.split('?')[0]];if(!file){res.writeHead(404);res.end();return;}res.setHeader('content-type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.setHeader('cache-control','no-store');res.end(await readFile(join(root,file)));});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+ const config=JSON.parse(await readFile(new URL('../examples/public-diagnostics.json',import.meta.url),'utf8'));config.url=`http://127.0.0.1:${server.address().port}/`;const configPath=join(root,'audit.json');await writeFile(configPath,JSON.stringify(config));
+ const output=resolve('reports',`diagnostic-demo-${Date.now()}-${process.pid}`),before=join(output,'before'),after=join(output,'after'),chromium=process.env.CHROMIUM_PATH||'chromium';
+ const profiles=new Set((await readdir(tmpdir())).filter(n=>n.startsWith('vision-ui-doctor-'))),messages=[],io={stdout:m=>messages.push(m),stderr:m=>messages.push(m)};
+ assert.equal(await runPublicCli(['spa-audit','--config',configPath,'--out',before,'--chromium',chromium],io),2,messages.join('\n'));
+ const run=JSON.parse(await readFile(join(before,'public-run.json'),'utf8')),issues=spaIssues(run),packet=JSON.parse(await readFile(join(before,'agent-packet.json'),'utf8'));
+ assert.equal(packet.coverage.incomplete,0,JSON.stringify(run.states.map(s=>({step:s.step,status:s.status,failure:s.failure,stage:s.failureStage}))));
+ const positives=[['LOW_TEXT_CONTRAST','#low-contrast'],['LOW_TEXT_CONTRAST','#visible-override'],['TEXT_CONTENT_CLIPPED','#clipped-text'],['FORM_LABEL_MISSING','#missing-label'],['FORM_ERROR_NOT_ASSOCIATED','#invalid-field'],['CONTROL_NOT_KEYBOARD_REACHABLE','#keyboard-role'],['SMALL_CROWDED_TARGET','#small-a'],['SMALL_CROWDED_TARGET','#small-b'],['FIXED_OVERLAY_BLOCKS_CONTROL','#covered-control'],['HIDDEN_CONTROL_IN_TAB_ORDER','#hidden-tab'],['INTERACTIVE_ELEMENT_CLIPPED','#true-clip']];
+ for(const [category,selector] of positives)assert.ok(issues.some(i=>i.finding.category===category&&i.finding.selector===selector),category+' '+selector);
+ const valid=['#editor-code','#mirror-token','#last-line-number','#collapsed-label','#hidden-child','#ellipsis','#good-input','#title-input','#disabled-input','#isolated-small','#complex-paint'];
+ for(const selector of valid)assert.equal(issues.some(i=>i.finding.selector===selector),false,'valid counterexample '+selector);
+ assert.ok(run.states.every(s=>s.ux.stable));assert.equal(issues.some(i=>i.finding.category==='STATE_UNSTABLE'),false);assert.match(await readFile(join(root,'style.css'),'utf8'),/transition: transform 800ms/);
+ assert.ok(run.states.some(s=>s.diagnostics.some(d=>d.category==='INTENTIONAL_SCROLL_REGION')));assert.ok(run.states.every(s=>s.detectorCoverage.unsupportedContrast>0));
+ const mirror=run.states[0].diagnostics.find(d=>d.selector==='#mirror-token'&&d.classification==='intentional-candidate');assert.ok(mirror);assert.equal(mirror.id,findingId({category:'CONTENT_CLIPPED',route:'diagnostics/initial',viewport:'small',selector:'#mirror-token'}));assert.equal(mirror.synchronization,'unsupported');
+ assert.ok(packet.metrics.bytes<=16384);assert.equal(packet.metrics.bytes,Buffer.byteLength(JSON.stringify(packet)));
+ const selected=positives.filter(([c])=>['LOW_TEXT_CONTRAST','TEXT_CONTENT_CLIPPED','FORM_LABEL_MISSING','CONTROL_NOT_KEYBOARD_REACHABLE','INTERACTIVE_ELEMENT_CLIPPED'].includes(c)).slice(0,6).map(([c,s])=>issues.find(i=>i.finding.category===c&&i.finding.selector===s).finding.id);
+ const offline=[],jsonIO={stdout:m=>offline.push(JSON.parse(m)),stderr:m=>assert.fail(m)};assert.equal(await runPublicCli(['sources','--report',join(before,'public-run.json'),'--issue',selected[0],'--project-root',root],jsonIO),0);assert.ok(offline.at(-1).results[0].candidates.some(c=>c.path==='style.css'));
+ // Authorized external edits ONLY to the disposable fixture copy; transitions remain 800ms.
+ await writeFile(join(root,'style.css'),(await readFile(join(root,'style.css'),'utf8')).replace('color: #bbb','color: #000').replace('#clipped-text, #ellipsis {','#ellipsis {').replace('.crowded, #isolated-small {','#isolated-small {').replace('width: 70px; height: 30px','width: 180px; height: 48px').replace('#fixed-shade { position: fixed;','#fixed-shade { display: none; position: fixed;')+'\n.crowded { width:32px; height:32px; min-height:32px; }');
+ await writeFile(join(root,'index.html'),(await readFile(join(root,'index.html'),'utf8')).replace('id="missing-label"','id="missing-label" aria-label="Example input"').replace('id="keyboard-role" role="button"','id="keyboard-role" role="button" tabindex="0"').replace('id="hidden-tab" type="button"','id="hidden-tab" type="button" tabindex="-1"').replace('aria-describedby="missing-error"','aria-describedby="feedback"'));
+ const args=['spa-verify','--report',join(before,'public-run.json'),'--out',after,'--chromium',chromium];for(const id of selected)args.push('--issue',id);
+ assert.equal(await runPublicCli(args,io),0,messages.join('\n'));
+ const fresh=JSON.parse(await readFile(join(after,'public-run.json'),'utf8')),comparison=JSON.parse(await readFile(join(after,'comparison.json'),'utf8'));
+ assert.ok(comparison.selected.every(i=>i.status==='resolved-for-this-check'));assert.equal(spaIssues(fresh).length,0);assert.equal(comparison.coverageIncomplete,0);
+ const newProfiles=(await readdir(tmpdir())).filter(n=>n.startsWith('vision-ui-doctor-')&&!profiles.has(n));assert.deepEqual(newProfiles,[]);
+ t.diagnostic(JSON.stringify({evidence:output,seededDefectPairs:positives.length,detectedDefectPairs:positives.filter(([c,s])=>issues.some(i=>i.finding.category===c&&i.finding.selector===s)).length,validCounterexamples:valid.length,falsePositivePairs:valid.filter(s=>issues.some(i=>i.finding.selector===s)).length,missedDefectPairs:0,rawFindings:issues.length,groups:run.rootCauseCandidates.length,packetBytes:packet.metrics.bytes,transitionSamples:run.states.filter(s=>s.step==='open').map(s=>s.ux.samples),freshIssues:spaIssues(fresh).length,newProfiles:newProfiles.length}));
+});
