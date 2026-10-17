@@ -1,3 +1,7 @@
+![Generated conceptual illustration of the Vision UI Doctor workflow, not a product screenshot](assets/hero.png)
+
+*Generated conceptual illustration — not an existing GUI, actual screenshot, or real diagnostic result. Vision UI Doctor is currently a CLI tool.*
+
 # Vision UI Doctor
 
 **Find website UI problems. Understand the report. Fix what matters.**
@@ -11,6 +15,10 @@ Vision UI Doctor is a **local Node.js tool** that checks public website layouts 
 > **Public beta:** Expect occasional browser timeouts and incomplete coverage. A clean result does **not** mean every page or interaction is bug-free. The tool does not automatically modify your website.
 
 ## 🚀 Start here (Windows PowerShell)
+
+![Generated conceptual quick-start illustration: scan, read, approve a small fix, and verify again](assets/quick-start.png)
+
+*Generated conceptual illustration, not evidence of a successful scan or fix. Its example commands use source-checkout paths; follow the npm installation commands below. Source edits require your approval, and verification remains scoped to measured states.*
 
 **You need:** Node.js **22 or newer**, Chrome or Chromium installed, and a **local public website** you can open in your browser. You do not need to know Git or clone this repository.
 
@@ -103,6 +111,15 @@ Agent availability and skill discovery vary by host. Installation support does n
 ## 🖼️ Visual overview
 
 A designed overview and quick-start illustration are available as optional repository assets. These are **illustrations, not screenshots of a working GUI or real scan results**. The current product is primarily a CLI.
+
+<details>
+<summary>Optional generated report mockup — not actual scan output</summary>
+
+![Generated conceptual report mockup with fictional findings, not a real diagnostic result](assets/illustrative-demo.png)
+
+This generated conceptual illustration uses fictional counts, findings, version labels and presentation. It is **not** an actual screenshot, current report schema, or evidence of a real scan. Use the report files from your own run to assess findings and coverage.
+
+</details>
 
 ## 🛠️ Need more options?
 
