@@ -8,6 +8,7 @@ import {isPaintedElement} from './detectors/visibility.js';
 import {buildUxSnapshotScript,detectUxIssues,rootCauseCandidates,uxGeometryStamp} from './detectors/ux.js';
 import {buildUsabilitySnapshotScript,detectUsability} from './detectors/usability.js';
 import {waitForStableGeometry} from './state-stability.js';
+import {buildExperienceSnapshotScript,detectExperience} from './detectors/experience.js';
 
 const keys=(v,allowed)=>{if(!v||typeof v!=='object'||Array.isArray(v)||Object.keys(v).some(k=>!allowed.includes(k)))throw usage('Unknown or invalid public SPA configuration fields (values withheld)');};
 const id=v=>{if(typeof v!=='string'||!/^[-a-zA-Z0-9_]{1,40}$/.test(v))throw usage('Use unique 1-40 character state IDs');return v;};
@@ -15,8 +16,9 @@ const selector=v=>{if(typeof v!=='string'||v.length>120||! /^(?:#[a-zA-Z_][\w-]*
 const list=v=>{if(!Array.isArray(v)||v.length>8||new Set(v).size!==v.length)throw usage('Expectations allow at most 8 unique selectors each');return v.map(selector);};
 const safeUrl=(base,value)=>{const n=typeof value==='string'&&value.length<=2048?normalizeRouteUrl(base,value):null;if(!n||hasSensitiveUrlState(n.navigationUrl))throw usage('SPA URL must be public, non-sensitive and within the explicit base scope');return n.identity;};
 function validateUx(ux){
- keys(ux,['regions','alignments','usability','stabilizeMs']);
+ keys(ux,['regions','alignments','usability','experience','stabilizeMs']);
  if(ux.usability!==undefined&&typeof ux.usability!=='boolean')throw usage('UX usability must be an explicit boolean');
+ if(ux.experience!==undefined&&typeof ux.experience!=='boolean')throw usage('UX experience must be an explicit boolean');
  if(ux.stabilizeMs!==undefined&&(!Number.isInteger(ux.stabilizeMs)||ux.stabilizeMs<250||ux.stabilizeMs>15000))throw usage('Explicit stabilization budget is 250-15000ms within the shared run deadline');
  const regions=ux.regions??[],alignments=ux.alignments??[];
  if(!Array.isArray(regions)||regions.length>20||!Array.isArray(alignments)||alignments.length>10)throw usage('UX checks allow at most 20 regions and 10 alignment expectations');
@@ -24,7 +26,7 @@ function validateUx(ux){
  if(new Set(r.map(x=>x.selector)).size!==r.length||r.some(v=>v.allowOverlapWith.some(s=>!r.some(x=>x.selector===s))))throw usage('UX regions must be unique and allowed overlaps reference declared regions');
  const a=alignments.map(v=>{keys(v,['id','selectors','axis','tolerancePx']);id(v.id);const selectors=list(v.selectors);if(selectors.length<2||!['left','right','top','bottom'].includes(v.axis)||!Number.isInteger(v.tolerancePx)||v.tolerancePx<0||v.tolerancePx>40)throw usage('Alignment needs 2-8 peers, a rectangle edge and 0-40px declared tolerance');return {id:v.id,selectors,axis:v.axis,tolerancePx:v.tolerancePx};});
  if(new Set(a.map(x=>x.id)).size!==a.length)throw usage('Duplicate alignment IDs');
- return {regions:r,alignments:a,...(ux.usability!==undefined?{usability:ux.usability}:{}),...(ux.stabilizeMs!==undefined?{stabilizeMs:ux.stabilizeMs}:{})};
+ return {regions:r,alignments:a,...(ux.usability!==undefined?{usability:ux.usability}:{}),...(ux.experience!==undefined?{experience:ux.experience}:{}),...(ux.stabilizeMs!==undefined?{stabilizeMs:ux.stabilizeMs}:{})};
 }
 export function validateSpaConfig(input,{allowRemote=false}={}){
  keys(input,['schemaVersion','url','viewports','timeoutMs','scenarios','ux']);
@@ -168,6 +170,11 @@ export async function scanSpa(input,{chromium,allowRemote=false,browserFactory=b
         state.diagnostics.push(...result.diagnostics.map(f=>({...f,selector:safeText(f.selector)})));
         for(const f of result.issues)state.issues.push({...issue(state,f.category,safeText(f.selector),numeric(f.evidence)),severity:f.severity,confidence:f.confidence,assessment:f.assessment,explanation:f.explanation,suggestion:f.suggestion});
        }
+       if(config.ux.experience){
+        const result=detectExperience(await bounded(()=>tab.evaluate(buildExperienceSnapshotScript(config.ux)),'experience'));
+        state.experienceCoverage=result.coverage;if(result.coverage.truncated||result.coverage.omitted)state.auditIncomplete=true;
+        for(const f of result.issues)state.issues.push({...issue(state,f.category,safeText(f.selector),numeric(f.evidence)),severity:f.severity,confidence:f.confidence,assessment:f.assessment,suggestion:f.suggestion,cause:{...f.cause,ancestor:safeText(f.cause.ancestor),...(f.cause.related?{related:safeText(f.cause.related)}:{})}});
+       }
       }
       }
      state.rawFindingCount=state.issues.length+(state.diagnostics??[]).filter(d=>d.originalCategory).length;
@@ -190,7 +197,7 @@ export async function scanSpa(input,{chromium,allowRemote=false,browserFactory=b
    if(tab)await tab.close();
   }
  }finally{await browser.close();}
- return {kind:'public-spa',schemaVersion:1,authAllowed:false,networkIsolation:'NONE',mode:'LOCAL_TRUSTED',browserVersion,config,states,runId:digest({config,states}),...(config.ux?{detectorsVersion:'ux-accuracy-2',rootCauseCandidates:rootCauseCandidates(states)}:{})};
+ return {kind:'public-spa',schemaVersion:1,authAllowed:false,networkIsolation:'NONE',mode:'LOCAL_TRUSTED',browserVersion,config,states,runId:digest({config,states}),...(config.ux?{detectorsVersion:config.ux.experience?'ux-experience-3':'ux-accuracy-2',rootCauseCandidates:rootCauseCandidates(states)}:{})};
 }
 
 export function spaStates(run){
@@ -198,7 +205,7 @@ export function spaStates(run){
  const config=validateSpaConfig(run.config,{allowRemote:true});
  if(!Array.isArray(run.states)||run.states.length>100)throw usage('Invalid bounded SPA states');
  const expected=planned(config),seen=new Set();
- for(const s of run.states){const key=stateKey(s);if(seen.has(key)||!expected.some(p=>stateKey(p)===key)||!['audited','failed','skipped','unknown'].includes(s.status)||!Array.isArray(s.issues)||s.issues.length>(config.ux?.usability?110:config.ux?70:40))throw usage('Invalid or duplicate SPA report state');seen.add(key);}
+ for(const s of run.states){const key=stateKey(s);if(seen.has(key)||!expected.some(p=>stateKey(p)===key)||!['audited','failed','skipped','unknown'].includes(s.status)||!Array.isArray(s.issues)||s.issues.length>(config.ux?.experience?130:config.ux?.usability?110:config.ux?70:40))throw usage('Invalid or duplicate SPA report state');seen.add(key);}
  return expected.map(p=>({...p,...run.states.find(s=>stateKey(s)===stateKey(p)),status:run.states.find(s=>stateKey(s)===stateKey(p))?.status??'unknown'}));
 }
 export function spaIssues(run,ids){
@@ -229,12 +236,17 @@ export function spaPacket(run,{issueIds,maxIssues=10,maxBytes=16384}={}){
  // Read reports are untrusted: never echo arbitrary text fields from them.
  for(const f of issues){if(!/^[A-Z_]{1,60}$/.test(f.category)||!['high','medium','low'].includes(f.severity)||!['high','medium','low'].includes(f.confidence))throw usage('Invalid SPA finding');if(f.url)f.url=safeUrl(run.config.url,f.url);if(f.selector!=='html'&&!/^[#.\w >:[\]="()-]{1,250}$/.test(f.selector))throw usage('Invalid finding selector');}
  const roots=rootCauseCandidates(states);
- if(run.detectorsVersion==='ux-accuracy-2'){
+ if(['ux-accuracy-2','ux-experience-3'].includes(run.detectorsVersion)){
   packet.findingSummary={raw:states.reduce((n,s)=>n+(Number.isSafeInteger(s.rawFindingCount)?s.rawFindingCount:s.issues?.length??0),0),reported:spaIssues(run).length,intentionalObservations:states.reduce((n,s)=>n+(s.diagnostics??[]).filter(d=>d.classification==='intentional').length,0),intentionalCandidates:states.reduce((n,s)=>n+(s.diagnostics??[]).filter(d=>d.classification==='intentional-candidate').length,0),assessments:Object.fromEntries(['confirmed','probable','needs-review','unsupported'].map(a=>[a,spaIssues(run).filter(x=>(x.finding.assessment??'probable')===a).length]))};
   const total=key=>states.reduce((n,s)=>n+(Number.isSafeInteger(s.detectorCoverage?.[key])?s.detectorCoverage[key]:0),0);
   packet.detectorCoverage={geometry:'bounded',scrollAndVisibility:'bounded',animation:'bounded-observation',usability:run.config.ux?.usability?'bounded':'not-requested',measuredUsabilityStates:states.filter(s=>s.detectorCoverage).length,plannedStates:states.length,examinedElements:total('examined'),measuredContrast:total('contrastMeasured'),unsupportedContrast:total('unsupportedContrast'),omittedNewFindings:total('issueOmitted'),unsupported:['keyboard-traversal','focus-appearance','composited-contrast','scroll-trap-execution','typography-hierarchy','automatic-component-consistency','full-visual-understanding']};
   const advice={LOW_TEXT_CONTRAST:'Increase text/background contrast; only opaque sRGB combinations were measured.',TEXT_CONTENT_CLIPPED:'Inspect wrapping and clip dimensions; preserve accessible expansion if truncation is intended.',FORM_LABEL_MISSING:'Associate a non-empty label; placeholder alone is not a label.',FORM_ERROR_NOT_ASSOCIATED:'Associate meaningful error feedback and verify announcements separately.',SMALL_CROWDED_TARGET:'Increase hit area or spacing; isolated and inline small targets were excluded.',CONTROL_NOT_KEYBOARD_REACHABLE:'Use native button semantics or implement focus and keyboard operation.',HIDDEN_CONTROL_IN_TAB_ORDER:'Remove collapsed controls from the tab order and restore them when visible.',FIXED_OVERLAY_BLOCKS_CONTROL:'Inspect fixed/sticky layering and reserved content space.'};
   for(const item of issues){const source=all.find(x=>x.finding.id===item.id)?.finding;item.assessment=source?.assessment??(/^STATE_/.test(item.category)?'unsupported':'probable');if(advice[item.category])item.guidance=advice[item.category];}
+ }
+ if(run.config.ux?.experience){
+  packet.experienceCoverage={classification:'heuristic-layout-symptoms',measuredStates:states.filter(s=>s.experienceCoverage).length,plannedStates:states.length,truncatedStates:states.filter(s=>s.experienceCoverage?.truncated).length,omitted:states.reduce((n,s)=>n+(Number.isSafeInteger(s.experienceCoverage?.omitted)?s.experienceCoverage.omitted:0),0)};
+  const advice={INLINE_PROSE_FRAGMENTATION:'Inspect prose parent display and keep inline semantic tokens in normal text flow.',CONTENT_SPACE_STARVATION:'Review pane sizing and reserved controls using measured readable lines.',EXCESSIVE_CONTROL_WRAPPING:'Review toolbar wrapping and orphan action rows; confirm grouping intent.',TEXT_BADGE_COLLISION:'Inspect text min-width/shrink, badge sizing and stacking; retain valid ellipsis.',MOBILE_CHROME_DENSITY:'Review header/control height together with the remaining usable content area.'};
+  for(const item of issues)if(advice[item.category])item.guidance=advice[item.category];
  }
  for(const f of issues){const state=states.find(s=>s.scenario===f.scenario&&s.step===f.step&&s.viewport===f.viewport);if(/^state-[a-f0-9]{16}\.png$/.test(state?.screenshot?.file)){const region=state.screenshot.regions?.find(r=>r.selector===f.selector);f.visualEvidence={file:state.screenshot.file,rect:region?numeric(region.rect):null,localOnly:true};}}
  function size(){

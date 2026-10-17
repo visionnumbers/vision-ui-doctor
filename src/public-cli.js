@@ -43,6 +43,7 @@ spa-audit executes ONLY explicit public toggle/navigation/tab steps in the separ
 packet/sources/snippet also accept SPA public-run.json. No arbitrary control discovery/clicks.
 Optional ux regions/alignments add responsive, overlap and declared-alignment evidence with root-cause candidates.
 ux.usability:true adds bounded text/contrast/form/control checks; ux.stabilizeMs opts into a longer bounded transition observation phase.
+ux.experience:true adds conservative prose, content-space, toolbar-wrap, text/badge and mobile-header diagnostics.
 SPA screenshots are opt-in local viewport PNGs; no pixel diff or AI image upload.
 Protected/auth/M2 journeys/backend execution and SECURE_ISOLATED are unavailable.
 Exits: 0 successful command/no findings; 2 findings/incomplete/unknown verification; 64 invalid input; 1 runtime/cleanup failure.

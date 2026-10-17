@@ -1,5 +1,15 @@
 # Vision UI Doctor
 
+## Contextual UI diagnostics (opt-in)
+
+`ux.experience: true` adds bounded prose-fragmentation, usable-content-space,
+toolbar-wrapping, text/badge-collision and mobile-header-impact candidates to the
+public SPA workflow. These are measured **probable/needs-review** symptoms, not
+confirmed design defects. Existing findings and CLI commands are preserved.
+See [triggers, exclusions, confidence and sampling limits](examples/experience-checks.md).
+Packets retain the existing size bounds, source handoff and uncertain root groups.
+Known Windows cleanup failures remain a separate beta limitation.
+
 ## Diagnostic accuracy + usability batch
 
 The public SPA engine now has optional bounded text clipping/contrast, form-label/
