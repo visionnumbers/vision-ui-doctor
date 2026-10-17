@@ -68,6 +68,16 @@ uploaded or deployed automatically.
 [Detailed CLI/diagnostic guide (preserved DX1 documentation)](guides/usage.md) ·
 [Canonical skill](skills/vision-ui-doctor/SKILL.md) · [License](LICENSE)
 
+## Quick developer workflow
+
+1. Start your local public website (for example `http://localhost:5173`).
+2. Run `node $vud scan --url http://localhost:5173 --out reports/scan` from the application's directory.
+3. Read `reports/scan/REPORT.md`, or let an installed agent start with `scan-status.json` and `AGENT_HANDOFF.md`.
+4. Review measured issues and incomplete states. Approve only the specific fixes you want.
+5. Run a **fresh** verify/scan after changes; skipped states are never treated as resolved.
+
+> **Feedback welcome:** [Report a bug](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=bug_report.md), [request a feature](https://github.com/visionnumbers/vision-ui-doctor/issues/new?template=feature_request.md), or [join the public-beta feedback thread](https://github.com/visionnumbers/vision-ui-doctor/issues). Never upload credentials, cookies, private browser profiles or unredacted private reports.
+
 ## Known issues
 
 - Browser navigation/CDP and Windows lifecycle/stream-cleanup timeouts can fail
