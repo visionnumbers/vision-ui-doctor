@@ -16,7 +16,8 @@ export function experienceFixture(pattern,variant){
  }
  if(pattern==='wrap'){
   const tag=legitimate?'nav':'div';body=`<${tag} id="subject" ${legitimate?'aria-label="Grouped navigation"':'role="toolbar"'}>${Array.from({length:7},(_,i)=>`<button type="button">Action ${i}</button>`).join('')}</${tag}>`;
-  css=`#subject { display:flex;flex-flow:row wrap;gap:4px; width:${broken||legitimate?210:320}px; } #subject button { height:36px; width:${broken||legitimate?95:40}px; font-size:10px; padding:0; }`;
+  // Explicit metrics keep 36px buttons below the detector's 2.5-line card exclusion.
+  css=`#subject { display:flex;flex-flow:row wrap;gap:4px; width:${broken||legitimate?210:320}px; } #subject button { height:36px; width:${broken||legitimate?95:40}px; font-size:10px; line-height:16px; padding:0; }`;
  }
  if(pattern==='collision'){
   body=`<div id="subject"><span id="title">A very long readable title about important concepts</span><span id="badge" ${legitimate?'aria-hidden="true"':''}>5 min</span></div>`;
