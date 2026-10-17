@@ -8,9 +8,29 @@ import {installSkills,installedStatus,uninstallSkills,defaultRuntime,BUNDLE_FILE
 import {AGENT_TARGETS,destination,validateAdapter} from '../src/skill-adapters.js';
 import {runInstallerCli} from '../src/install-cli.js';
 import {probeRuntime} from '../skills/vision-ui-doctor/scripts/vud.mjs';
+import {createHash} from 'node:crypto';
 
 async function fixture(t){const root=await mkdtemp(join(tmpdir(),'vud installer space-'));t.after(()=>rm(root,{recursive:true,force:true}));const project=join(root,'actual project'),home=join(root,'actual user');await mkdir(project);await mkdir(home);return {project,home};}
 const options=(ctx,id,scope='project')=>({...ctx,agents:[id],scope});
+
+test('older owned instructions update only through explicit uninstall/reinstall; local edits block both',async t=>{
+ const ctx=await fixture(t),opts=options(ctx,'codex');await installSkills(opts);
+ const path=destination(AGENT_TARGETS[0],'project',ctx),skill=join(path,'SKILL.md'),manifest=join(path,'.vision-ui-doctor-install.json');
+ // Model a genuine previous bundle: its old bytes match its recorded ownership.
+ const older='---\nname: vision-ui-doctor\ndescription: Previous public audit instructions\n---\nOld workflow\n';
+ const owned=JSON.parse(await readFile(manifest));owned.files['SKILL.md']=createHash('sha256').update(older).digest('hex');
+ await writeFile(skill,older);await writeFile(manifest,JSON.stringify(owned));
+ assert.equal((await installedStatus(opts)).installations[0].status,'owned');
+ await assert.rejects(installSkills(opts),/older installation/);assert.equal(await readFile(skill,'utf8'),older);
+ await writeFile(skill,older+'Local edit');
+ await assert.rejects(uninstallSkills(opts),/preserved/);await assert.rejects(installSkills(opts),/collision/);
+ assert.equal(await readFile(skill,'utf8'),older+'Local edit');
+ // Explicitly restore known old bytes in this disposable fixture only.
+ await writeFile(skill,older);await uninstallSkills(opts);await installSkills(opts);
+ assert.equal(await readFile(skill,'utf8'),await readFile('skills/vision-ui-doctor/SKILL.md','utf8'));
+ assert.equal(await readFile(join(path,'references/cli.md'),'utf8'),await readFile('skills/vision-ui-doctor/references/cli.md','utf8'));
+ assert.equal((await installSkills(opts)).installations[0].status,'already-installed');
+});
 test('canonical Agent Skills metadata and linked resources are valid without a YAML dependency',async()=>{
  const text=await readFile('skills/vision-ui-doctor/SKILL.md','utf8'),m=validateCanonicalSkill(text);assert.equal(m.name,'vision-ui-doctor');assert.equal(m.license,'MIT');assert.ok(m.description.length>30&&m.description.length<=1024);
  const check=spawnSync(process.execPath,['skills/vision-ui-doctor/scripts/vud.mjs','--check'],{encoding:'utf8',timeout:10000});assert.equal(check.status,0,check.stderr);

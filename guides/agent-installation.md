@@ -109,6 +109,27 @@ Concurrent edits/installers and all other projects' hidden/plugin/system skill
 registries are not comprehensively inventoried; avoid concurrent operations and
 check host discovery for duplicates beyond the known roots.
 
+## Updating an owned skill (including DX2 to DX3)
+
+An existing identical bundle is idempotent; newer canonical content is intentionally
+not silently copied over an installation. Back up the installed directory outside
+agent discovery roots (keep local bindings/manifest private), then inspect
+`install --status --agent codex --scope project` using the maintained installer.
+With explicit update approval, use its existing `uninstall --agent codex --scope
+project` followed by `install --agent codex --scope project`, then run the installed
+helper `--check` and confirm host discovery/refresh. Substitute the actual agent,
+scope and project-root consistently; do not update other projects implicitly.
+
+Uninstall first verifies stored ownership hashes, including the previous version's
+instructions. Locally modified/unmanaged files block both replacement and removal:
+stop, preserve the edits and resolve them explicitly; do not forge hashes, delete
+manifests or force an overwrite. Shared bundles retain other agent registrations;
+coordinate approval for all registered agents and reinstall the same selected
+agents rather than silently dropping ownership. Unrelated files remain; if their
+remaining directory blocks reinstall, stop and preserve/resolve it separately.
+This is a two-step operation, not an atomic updater: if reinstall fails, report it
+and retain the backup. Refreshing discovery is separate from filesystem success.
+
 ## Other Agent Skills hosts
 
 Supply a declarative JSON adapter (no executable hooks):
